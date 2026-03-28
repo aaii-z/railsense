@@ -1,0 +1,29 @@
+# UI
+streamlit
+
+# Database
+psycopg2-binary
+pgvector
+
+# Embeddings
+sentence-transformers
+
+# ML - Task 2
+scikit-learn
+pandas
+numpy
+joblib
+
+# Document parsing - Task 3 KB
+python-pptx
+python-docx
+
+# Task 1 - ticket search
+requests
+beautifulsoup4
+
+# Deep learning - tiny GPT
+torch
+
+# Utils
+python-dotenv
