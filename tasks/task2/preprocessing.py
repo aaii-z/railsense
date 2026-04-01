@@ -4,13 +4,16 @@ from sklearn.preprocessing import LabelEncoder
 import pickle
 import os
 
-DESTINATION  = "WAT"
-TARGET_COL   = "target_delay_at_WAT"
+# Full route order Weymouth → Waterloo
+ROUTE = ["WEY","DCH","WRM","HAM","POO","PKS","BSM","BMH","BCU","SOU","SOA","WIN","BSK","WOK","GLD","CLJ","WAT"]
+
+TARGET_COL   = "target_delay_at_destination"
 FEATURE_COLS = [
-    "station_encoded",   # current station as number
-    "arrival_delay",     # current delay in minutes
-    "planned_arr_mins",  # scheduled arrival (mins since midnight)
-    "day_of_week",       # 0=Mon, 6=Sun
+    "station_encoded",       # current station as number
+    "destination_encoded",   # destination station as number
+    "arrival_delay",         # current delay in minutes
+    "planned_arr_mins",      # scheduled arrival (mins since midnight)
+    "day_of_week",           # 0=Mon, 6=Sun
     "month",
     "is_peak_hour",
 ]
@@ -57,13 +60,6 @@ def compute_delays(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def extract_waterloo_delay(df: pd.DataFrame) -> pd.DataFrame:
-    """Get final arrival delay at WAT for each journey — this is the prediction target."""
-    wat = df[df["location"] == DESTINATION][["rid", "arrival_delay"]].copy()
-    wat = wat.rename(columns={"arrival_delay": TARGET_COL})
-    return wat.drop_duplicates(subset="rid", keep="first")
-
-
 def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
     """Add day of week, month, and peak hour flag."""
     df = df.copy()
@@ -79,23 +75,77 @@ def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def build_features(df: pd.DataFrame, wat_delays: pd.DataFrame) -> pd.DataFrame:
-    """Combine mid-journey station rows with WAT target delay."""
-    exclude = {DESTINATION, "WEY"}
-    mid_df  = df[~df["location"].isin(exclude)].copy()
-    mid_df  = mid_df.dropna(subset=["arrival_delay"])
-    merged  = mid_df.merge(wat_delays, on="rid", how="inner")
-    return merged.dropna(subset=[TARGET_COL])
+def extract_all_station_delays(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    For each journey (rid), get the arrival delay at every station.
+    Returns a wide-format lookup: rid → {station: delay}
+    """
+    route_stations = set(ROUTE)
+    station_delays = (
+        df[df["location"].isin(route_stations)]
+        .dropna(subset=["arrival_delay"])
+        [["rid", "location", "arrival_delay"]]
+        .drop_duplicates(subset=["rid", "location"], keep="first")
+    )
+    return station_delays
+
+
+def build_features(df: pd.DataFrame, station_delays: pd.DataFrame) -> pd.DataFrame:
+    """
+    For each mid-journey station row, create one training row per valid destination
+    that is ahead of the current station on the route.
+
+    Example: train is at SOU (index 9) → destinations can be SOA, WIN, BSK, WOK, GLD, CLJ, WAT
+    """
+    rows = []
+
+    # Build a fast lookup: (rid, station) → delay
+    delay_lookup = station_delays.set_index(["rid", "location"])["arrival_delay"].to_dict()
+
+    # Only keep mid-journey stations (exclude origin WEY)
+    mid_stations = ROUTE[1:]  # DCH onward
+
+    for _, row in df[df["location"].isin(mid_stations)].iterrows():
+        current_station = row["location"]
+        rid = row["rid"]
+
+        if pd.isna(row["arrival_delay"]):
+            continue
+
+        current_idx = ROUTE.index(current_station)
+
+        # All stations ahead of current position (must be at least one stop ahead)
+        for dest in ROUTE[current_idx + 1:]:
+            dest_delay = delay_lookup.get((rid, dest), None)
+            if dest_delay is None:
+                continue  # no recorded arrival at this destination for this journey
+
+            rows.append({
+                "rid":               rid,
+                "location":          current_station,
+                "destination":       dest,
+                "arrival_delay":     row["arrival_delay"],
+                "planned_arr_mins":  row["planned_arr_mins"],
+                "day_of_week":       row["day_of_week"],
+                "month":             row["month"],
+                "is_peak_hour":      row["is_peak_hour"],
+                TARGET_COL:          dest_delay,
+            })
+
+    return pd.DataFrame(rows)
 
 
 def encode_stations(df: pd.DataFrame, encoder=None, fit=True):
-    """Convert station codes to integers."""
+    """
+    Encode both current station and destination using the same LabelEncoder
+    so they share the same integer space.
+    """
     df = df.copy()
     if fit:
         encoder = LabelEncoder()
-        df["station_encoded"] = encoder.fit_transform(df["location"])
-    else:
-        df["station_encoded"] = encoder.transform(df["location"])
+        encoder.fit(ROUTE)  # fit on full route so encoding is consistent
+    df["station_encoded"]     = encoder.transform(df["location"])
+    df["destination_encoded"] = encoder.transform(df["destination"])
     return df, encoder
 
 
@@ -108,11 +158,12 @@ def run_preprocessing(data_dir: str, save_dir: str = "../../models/task2"):
     df = compute_delays(df)
     df = add_time_features(df)
 
-    wat_delays      = extract_waterloo_delay(df)
-    merged          = build_features(df, wat_delays)
+    station_delays  = extract_all_station_delays(df)
+    merged          = build_features(df, station_delays)
     merged, encoder = encode_stations(merged, fit=True)
 
     print(f"Ready: {len(merged)} rows, {merged['rid'].nunique()} journeys")
+    print(f"Destinations covered: {sorted(merged['destination'].unique())}")
 
     X, y = get_X_y(merged)
 
