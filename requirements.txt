@@ -27,3 +27,6 @@ torch
 
 # Utils
 python-dotenv
+
+# Visualization
+matplotlib
