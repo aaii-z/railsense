@@ -1,0 +1,1388 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" xmlns:sch0="http://www.thalesgroup.com/ojp/jpservices"
+                  xmlns:sch1="http://www.thalesgroup.com/ojp/common" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+                  xmlns:tns="http://ojp.nationalrail.co.uk" targetNamespace="http://ojp.nationalrail.co.uk">
+    <wsdl:types>
+        <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://www.thalesgroup.com/ojp/jpservices"
+                    xmlns:ns0="http://www.thalesgroup.com/ojp/common" attributeFormDefault="unqualified"
+                    elementFormDefault="qualified" targetNamespace="http://www.thalesgroup.com/ojp/jpservices">
+            <xsd:import namespace="http://www.thalesgroup.com/ojp/common" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+            <xsd:import namespace="http://www.thalesgroup.com/ojp/common" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+            <xsd:import namespace="http://www.thalesgroup.com/ojp/common" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+            <xsd:element name="DepartureBoardRequest" type="DepartureBoardRequestType"
+                         xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+            <xsd:element name="DepartureBoardResponse" type="DepartureBoardResponseType"
+                         xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+            <xsd:complexType name="DepartureBoardRequestType" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                        Retrieve real time departure and arrival information for either a specified station
+                        or the User's default Home or Work station. By Default, the journeys departing or arriving from
+                        now are
+                        retrieved. However, using the 'fromTime' parameter allows journeys in the future to be returned.
+                    </xsd:documentation>
+                </xsd:annotation>
+                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:element name="specifiedStation" type="SpecifiedStationDetail"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="stoppingPattern" type="ns0:StoppingPatternType"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="fromTime" type="xsd:dateTime"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:complexType name="DepartureBoardResponseType" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                        Departure board information for a specified station. A maximum of 20 journeys are returned.
+                        The number of journeys omitted from the response will also be provided.
+                    </xsd:documentation>
+                </xsd:annotation>
+                <xsd:complexContent xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:extension base="ns0:ReturnResponseType" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                        <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                            <xsd:element name="servicesOmitted" type="ns0:ServicesOmittedInteger"
+                                         xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                            <xsd:element maxOccurs="20" name="stationJourneyDetail" type="ns0:StationJourneyDetail"
+                                         xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                        </xsd:sequence>
+                    </xsd:extension>
+                </xsd:complexContent>
+            </xsd:complexType>
+            <xsd:complexType name="SpecifiedStationDetail" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                        The primary station is the station of interest i.e. journeys departing or
+                        arriving from this station will be returned. An optional filter station can also be provided.
+                        If given, the response will be contain only journeys which pass through this station.
+                    </xsd:documentation>
+                </xsd:annotation>
+                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:element name="primaryStationCrs" type="ns0:StationCrs"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="filterStationCrs" type="ns0:StationCrs"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:element name="RealtimeJourneyPlanRequest" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">Realtime journey planning request
+                    </xsd:documentation>
+                </xsd:annotation>
+                <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                        <xsd:element name="origin" type="ns0:CrsCode" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                        <xsd:element name="destination" type="ns0:CrsCode"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                        <xsd:element name="realtimeEnquiry" type="ns0:RealtimeEnquiryType"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                        <xsd:element name="outwardTime" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                            <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                <xsd:choice xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                    <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                        <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">Request outward
+                                            journeys arriving or departing by a certain time
+                                        </xsd:documentation>
+                                    </xsd:annotation>
+                                    <xsd:element name="arriveBy" type="xsd:dateTime"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:element name="departBy" type="xsd:dateTime"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:element name="firstTrainOfDay" type="xsd:date"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:element name="lastTrainOfDay" type="xsd:date"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                </xsd:choice>
+                            </xsd:complexType>
+                        </xsd:element>
+                        <xsd:element minOccurs="0" name="inwardTime" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                            <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">Populate the inward time
+                                    element to retrieve return journeys.
+                                </xsd:documentation>
+                            </xsd:annotation>
+                            <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                <xsd:choice xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                    <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                        <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">Request return
+                                            inward journeys arriving or departing by a certain time
+                                        </xsd:documentation>
+                                    </xsd:annotation>
+                                    <xsd:element name="arriveBy" type="xsd:dateTime"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:element name="departBy" type="xsd:dateTime"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:element name="firstTrainOfDay" type="xsd:date"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:element name="lastTrainOfDay" type="xsd:date"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                </xsd:choice>
+                            </xsd:complexType>
+                        </xsd:element>
+                        <xsd:choice xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                            <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">Request may include a
+                                    choice of via, interchange or excluded interchange details
+                                </xsd:documentation>
+                            </xsd:annotation>
+                            <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                <xsd:element maxOccurs="unbounded" minOccurs="0" name="via" type="ns0:CrsCode"
+                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                <xsd:element maxOccurs="unbounded" minOccurs="0" name="notVia" type="ns0:CrsCode"
+                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                            </xsd:sequence>
+                            <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                <xsd:element maxOccurs="unbounded" name="interchange" type="ns0:CrsCode"
+                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                            </xsd:sequence>
+                            <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                <xsd:element maxOccurs="unbounded" name="excludedInterchanges" type="ns0:CrsCode"
+                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                            </xsd:sequence>
+                        </xsd:choice>
+                        <xsd:element name="directTrains" type="xsd:boolean"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                        <xsd:element minOccurs="0" name="fareRequestDetails"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                            <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">Populate the fare
+                                    request details element to retrieve fare data.
+                                </xsd:documentation>
+                            </xsd:annotation>
+                            <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                    <xsd:element name="passengers" type="ns0:PassengerCounts"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:element name="fareClass" type="ns0:FareClassEnum"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                        <xsd:element maxOccurs="unbounded" minOccurs="0" name="railcard"
+                                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                            <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                    <xsd:element name="code" type="ns0:RailCardCode"
+                                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                    <xsd:element name="count" type="xsd:int"
+                                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                </xsd:sequence>
+                                            </xsd:complexType>
+                                        </xsd:element>
+                                    </xsd:sequence>
+                                </xsd:sequence>
+                            </xsd:complexType>
+                        </xsd:element>
+                        <xsd:element minOccurs="0" name="reducedTransferTime" type="xsd:boolean"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                        <xsd:element minOccurs="0" name="onlySearchForSleeper" type="xsd:boolean"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                        <xsd:element minOccurs="0" name="overtakenTrains" type="xsd:boolean"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                        <xsd:element minOccurs="0" name="increasedInterchange" type="ns0:IncreaseInterchangeTime"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                        <xsd:element minOccurs="0" name="operator" type="ns0:Operator"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                        <xsd:element minOccurs="0" name="rawRealtimeInfo" type="xsd:boolean"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                        <xsd:element minOccurs="0" name="planAnytimeToday" type="xsd:boolean"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="RealtimeJourneyPlanResponse" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">Realtime journey planning response
+                    </xsd:documentation>
+                </xsd:annotation>
+                <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:complexContent xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                        <xsd:extension base="ns0:ReturnResponseType" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                            <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                <xsd:element name="generatedTime" type="xsd:dateTime"
+                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                <xsd:element maxOccurs="5" minOccurs="0" name="outwardJourney" type="Journey"
+                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                    <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                        <xsd:appinfo xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                            <jaxb:property xmlns:jaxb="http://java.sun.com/xml/ns/jaxb"
+                                                           name="outwardJourneys"/>
+                                        </xsd:appinfo>
+                                    </xsd:annotation>
+                                </xsd:element>
+                                <xsd:element maxOccurs="5" minOccurs="0" name="inwardJourney" type="Journey"
+                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                    <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                        <xsd:appinfo xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                            <jaxb:property xmlns:jaxb="http://java.sun.com/xml/ns/jaxb"
+                                                           name="inwardJourneys"/>
+                                        </xsd:appinfo>
+                                    </xsd:annotation>
+                                </xsd:element>
+                                <xsd:element minOccurs="0" name="rarsStatus" type="RarsStatus"
+                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                            </xsd:sequence>
+                        </xsd:extension>
+                    </xsd:complexContent>
+                </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="RealtimeCallingPointsRequest" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">Realtime calling points request
+                    </xsd:documentation>
+                </xsd:annotation>
+                <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                        <xsd:element name="origin" type="ns0:StationCrs" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                        <xsd:element name="destination" type="ns0:StationCrs"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                        <xsd:element name="departure" type="xsd:dateTime" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                        <xsd:element name="arrival" type="xsd:dateTime" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="RealtimeCallingPointsResponse" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">Realtime calling points response
+                    </xsd:documentation>
+                </xsd:annotation>
+                <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:complexContent xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                        <xsd:extension base="ns0:ReturnResponseType" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                            <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                <xsd:element name="origin" type="ns0:StationCrs"
+                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                <xsd:element name="destination" type="ns0:StationCrs"
+                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                <xsd:element name="generatedTime" type="xsd:dateTime"
+                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                <xsd:element maxOccurs="unbounded" name="leg"
+                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                    <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                        <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                            <xsd:element name="id" type="ns0:Id"
+                                                         xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                            <xsd:element name="origin" type="ns0:StationCrs"
+                                                         xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                            <xsd:element name="destination" type="ns0:StationCrs"
+                                                         xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                            <xsd:element name="departure" type="xsd:dateTime"
+                                                         xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                            <xsd:element name="arrival" type="xsd:dateTime"
+                                                         xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                            <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                <xsd:element name="searchStatus" type="ns0:CallingPointsSearchStatus"
+                                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                <xsd:element maxOccurs="unbounded" name="realtimeCallingPoint"
+                                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                    <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                        <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                            <xsd:element name="station" type="ns0:StationCrs"
+                                                                         xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                            <xsd:element minOccurs="0" name="board" type="xsd:boolean"
+                                                                         xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                            <xsd:element minOccurs="0" name="alight" type="xsd:boolean"
+                                                                         xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                            <xsd:element minOccurs="0" name="platform"
+                                                                         type="ns0:Platform"
+                                                                         xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                            <xsd:element name="timetable"
+                                                                         xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                <xsd:complexType
+                                                                        xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                    <xsd:sequence
+                                                                            xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                        <xsd:element name="scheduledTimes"
+                                                                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                            <xsd:complexType
+                                                                                    xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                                <xsd:sequence
+                                                                                        xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                                    <xsd:element minOccurs="0"
+                                                                                                 name="arrival"
+                                                                                                 type="xsd:dateTime"
+                                                                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                                                    <xsd:element minOccurs="0"
+                                                                                                 name="departure"
+                                                                                                 type="xsd:dateTime"
+                                                                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                                                </xsd:sequence>
+                                                                            </xsd:complexType>
+                                                                        </xsd:element>
+                                                                    </xsd:sequence>
+                                                                </xsd:complexType>
+                                                            </xsd:element>
+                                                            <xsd:element name="realtime"
+                                                                         xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                <xsd:complexType
+                                                                        xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                    <xsd:sequence
+                                                                            xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                        <xsd:element minOccurs="0" name="updatedTimes"
+                                                                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                            <xsd:complexType
+                                                                                    xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                                <xsd:sequence
+                                                                                        xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                                    <xsd:element minOccurs="0"
+                                                                                                 name="arrival"
+                                                                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                                        <xsd:complexType
+                                                                                                xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                                            <xsd:sequence
+                                                                                                    xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                                                <xsd:element name="time"
+                                                                                                             type="xsd:dateTime"
+                                                                                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                                                                <xsd:element
+                                                                                                        minOccurs="0"
+                                                                                                        name="type"
+                                                                                                        type="ns0:UpdatedTimeType"
+                                                                                                        xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                                                                <xsd:element
+                                                                                                        name="overdue"
+                                                                                                        type="xsd:boolean"
+                                                                                                        xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                                                                <xsd:element
+                                                                                                        name="delayed"
+                                                                                                        type="xsd:boolean"
+                                                                                                        xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                                                            </xsd:sequence>
+                                                                                        </xsd:complexType>
+                                                                                    </xsd:element>
+                                                                                    <xsd:element minOccurs="0"
+                                                                                                 name="departure"
+                                                                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                                        <xsd:complexType
+                                                                                                xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                                            <xsd:sequence
+                                                                                                    xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                                                <xsd:element name="time"
+                                                                                                             type="xsd:dateTime"
+                                                                                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                                                                <xsd:element
+                                                                                                        minOccurs="0"
+                                                                                                        name="type"
+                                                                                                        type="ns0:UpdatedTimeType"
+                                                                                                        xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                                                                <xsd:element
+                                                                                                        name="overdue"
+                                                                                                        type="xsd:boolean"
+                                                                                                        xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                                                                <xsd:element
+                                                                                                        name="delayed"
+                                                                                                        type="xsd:boolean"
+                                                                                                        xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                                                            </xsd:sequence>
+                                                                                        </xsd:complexType>
+                                                                                    </xsd:element>
+                                                                                </xsd:sequence>
+                                                                            </xsd:complexType>
+                                                                        </xsd:element>
+                                                                        <xsd:element name="cancelled" type="xsd:boolean"
+                                                                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                                        <xsd:element minOccurs="0"
+                                                                                     name="cancellationReason"
+                                                                                     type="xsd:string"
+                                                                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                                        <xsd:element minOccurs="0"
+                                                                                     name="lateRunningReason"
+                                                                                     type="xsd:string"
+                                                                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                                    </xsd:sequence>
+                                                                </xsd:complexType>
+                                                            </xsd:element>
+                                                        </xsd:sequence>
+                                                    </xsd:complexType>
+                                                </xsd:element>
+                                            </xsd:sequence>
+                                            <xsd:element minOccurs="0" name="associations"
+                                                         xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                    <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                        <xsd:element maxOccurs="unbounded" name="associationStation"
+                                                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                            <xsd:complexType
+                                                                    xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                <xsd:sequence
+                                                                        xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                    <xsd:element name="station" type="ns0:StationCrs"
+                                                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                                    <xsd:element name="type" type="ns0:AssociationType"
+                                                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                                </xsd:sequence>
+                                                            </xsd:complexType>
+                                                        </xsd:element>
+                                                    </xsd:sequence>
+                                                </xsd:complexType>
+                                            </xsd:element>
+                                        </xsd:sequence>
+                                    </xsd:complexType>
+                                </xsd:element>
+                            </xsd:sequence>
+                        </xsd:extension>
+                    </xsd:complexContent>
+                </xsd:complexType>
+            </xsd:element>
+            <xsd:complexType name="Journey" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:element name="id" type="ns0:Id" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="origin" type="ns0:StationCrs" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="destination" type="ns0:StationCrs" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="realtimeClassification" type="ns0:RealtimeClassification"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="timetable" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                        <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                            <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                <xsd:element name="scheduled" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                    <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                        <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                            <xsd:element name="departure" type="xsd:dateTime"
+                                                         xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                            <xsd:element name="arrival" type="xsd:dateTime"
+                                                         xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                        </xsd:sequence>
+                                    </xsd:complexType>
+                                </xsd:element>
+                                <xsd:element minOccurs="0" name="realtime" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                    <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                        <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                            <xsd:element minOccurs="0" name="departure" type="xsd:dateTime"
+                                                         xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                            <xsd:element minOccurs="0" name="arrival" type="xsd:dateTime"
+                                                         xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                        </xsd:sequence>
+                                    </xsd:complexType>
+                                </xsd:element>
+                            </xsd:sequence>
+                        </xsd:complexType>
+                    </xsd:element>
+                    <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                        <xsd:element maxOccurs="unbounded" name="leg" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                            <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                    <xsd:element name="id" type="ns0:Id" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:element name="board" type="ns0:StationCrs"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:element name="alight" type="ns0:StationCrs"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:element maxOccurs="unbounded" minOccurs="0" name="origins"
+                                                 type="ns0:StationCrs" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:element maxOccurs="unbounded" minOccurs="0" name="destinations"
+                                                 type="ns0:StationCrs" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:element minOccurs="0" name="originPlatform" type="ns0:Platform"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:element minOccurs="0" name="destinationPlatform" type="ns0:Platform"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:element name="realtimeClassification" type="ns0:RealtimeClassification"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:element name="mode" type="ns0:TravelModeEnum"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:element minOccurs="0" name="operator" type="ns0:OperatorDetails"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                        <xsd:element name="timetable" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                            <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                    <xsd:element name="scheduled"
+                                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                        <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                            <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                <xsd:element name="departure" type="xsd:dateTime"
+                                                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                                <xsd:element name="arrival" type="xsd:dateTime"
+                                                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                            </xsd:sequence>
+                                                        </xsd:complexType>
+                                                    </xsd:element>
+                                                    <xsd:element minOccurs="0" name="realtime"
+                                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                        <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                            <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                                                <xsd:element minOccurs="0" name="departure"
+                                                                             type="xsd:dateTime"
+                                                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                                <xsd:element minOccurs="0" name="arrival"
+                                                                             type="xsd:dateTime"
+                                                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                                            </xsd:sequence>
+                                                        </xsd:complexType>
+                                                    </xsd:element>
+                                                </xsd:sequence>
+                                            </xsd:complexType>
+                                        </xsd:element>
+                                        <xsd:element minOccurs="0" name="undergroundTravelInformation"
+                                                     type="ns0:UndergroundTravelInformation"
+                                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    </xsd:sequence>
+                                </xsd:sequence>
+                            </xsd:complexType>
+                        </xsd:element>
+                        <xsd:element maxOccurs="unbounded" minOccurs="0" name="fare" type="ns0:Fare"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                        <xsd:element maxOccurs="unbounded" minOccurs="0" name="serviceBulletins"
+                                     type="ns0:ServiceBulletin" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    </xsd:sequence>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:complexType name="RarsStatus" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:element name="code" type="xsd:int" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="description" type="ns0:RarsDescription"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:element name="DepartureBoardFault" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">Departure board fault
+                    </xsd:documentation>
+                </xsd:annotation>
+                <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:complexContent xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                        <xsd:extension base="ns0:ReturnResponseType" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    </xsd:complexContent>
+                </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="RealtimeJourneyPlanFault" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">Realtime journey planning fault
+                    </xsd:documentation>
+                </xsd:annotation>
+                <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:complexContent xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                        <xsd:extension base="ns0:ReturnResponseType" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    </xsd:complexContent>
+                </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="RealtimeCallingPointsFault" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">Realtime calling points fault
+                    </xsd:documentation>
+                </xsd:annotation>
+                <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:complexContent xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                        <xsd:extension base="ns0:ReturnResponseType" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    </xsd:complexContent>
+                </xsd:complexType>
+            </xsd:element>
+        </xsd:schema>
+        <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://www.thalesgroup.com/ojp/common"
+                    attributeFormDefault="unqualified" elementFormDefault="qualified"
+                    targetNamespace="http://www.thalesgroup.com/ojp/common">
+            <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    Common Types for Online Journey Planner
+                    Copyright
+                    2008 Thales
+                </xsd:documentation>
+            </xsd:annotation>
+            <xsd:simpleType name="ResponseEnum" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:NMTOKEN" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:enumeration value="Ok" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="InsecureConnection" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="InvalidCredentials" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="InvalidPassword" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="InvalidSecurityAnswer" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="InvalidEmail" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="InvalidMobile" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="EmailAlreadyExists" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="MobileAlreadyExists" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="EmailAndMobileAlreadyExist" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="MobileVerificationRequirementMissing"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="EmailIsNotAnonymous" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="MobileIsNotAnonymous" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="EmailAndMobileAreNotAnonymous"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="MobileAlreadyVerified" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="MobileNotVerified" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="PasswordNotRequired" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="AccountNotFoundOrPasswordWrong"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="UpdatedEmailBlank" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="UpdatedFirstNameBlank" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="UpdatedLastBlank" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="UpdatedGenderBlank" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="UpdatedTitleBlank" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="UpdatedAddressBlank" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="UpdatedDateOfBirthBlank" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="UpdatedPostcodeBlank" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="UpdatedMobileNumberBlank" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="UpdatedSecurityAnswerBlank" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="SecurityQuestionNotProvided" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="SecurityAnswerNotProvided" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="TooManyJourneys" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="TooManyMyStations" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="HomeDefaultNotAvailable" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="WorkDefaultNotAvailable" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="StoppingPatternNotSpecified" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="DepartureBoardTimeout" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="UnknownJourneyId" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="UnknownMyStationId" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="UnknownRailcardCode" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="NoPassword" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="NoEmail" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="NoMobile" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="NoMobileAuthentication" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="NoFavouriteJourneysFound" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="NoRecentJourneysFound" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="NoMyStationsFound" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="NoJourneysOrStationsFound" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="StationDoesNotExist" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="StationsAreTheSame" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="JourneyDepartureBeforeNow" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="JourneyOriginAndDestinationAreTheSame"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="JourneyArrivalBeforeDeparture"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="LegOriginAndDestinationAreTheSame"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="LegArrivalEarlierThanDeparture"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="LegsDestinationAndOriginDoNotMatch"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="LegsDepartureEarlierThanArrival"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="ReturnDepartureEarlierThanOutward"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="DeliveryChannelUnavailable" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="SelectedAlertWithDays" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="SelectedAlertWithDuration" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="NoAlertsFound" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="AlertLimitExceeded" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="SingleAlertNotFound" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="StartDateEarlierThanToday" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="SuspensionEndDateEarlierThanStartDate"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="AlertingNotSuspended" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="TpaMailException" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="TpaSmsException" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="TpaTwitterException" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="AlertStartWindowAfterEnd" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="AlertDaysOfWeekSpecifiedForSelectedAlert"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="AlertDurationSpecifiedForSelectedAlert"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="AlertDaysOfWeekNotSpecifiedForFrequentAlert"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="AlertDurationNotSpecifiedForFrequentAlert"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="AlertTypeMismatchWithCredentials"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="TrainUidNotFound" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="TrainOperatingCompanyNotFound"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="DatabaseMisconfiguration" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="AdminUsernameAlreadyExists" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="AdminUserUsernameOrPasswordInvalid"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="AdminUserDoesNotExist" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="AdminUsersNotPresent" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="OutwardDateTimeInThePast" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="ReturnDateTimeInThePast" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="ReturnDateTimeBeforeOutwardDate"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="ViaStationSameAsFrom" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="AvoidStationSameAsFrom" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="IncludeStationSameAsFrom" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="ExcludeStationSameAsFrom" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="ViaStationSameAsTo" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="AvoidStationSameAsTo" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="IncludeStationSameAsTo" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="ExcludeStationSameAsTo" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="NoJourneysFound" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="JourneyPlanTimeout" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="JourneyPlanBadSearchStatus" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="JourneyPlanRarsError" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="JourneyPlanRarsBadStatus" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="JourneyPlanError" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="MatchingJourneyNotFound" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="CallingPointsError" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="OperationNotAllowedError" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="InvalidFromAndToStationCombination"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="InvalidViaStation" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="InvalidAvoidStation" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="InvalidInterchangeStation" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="InvalidExcludeStation" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="TwitterAlertNotAllowed" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="TwitterScreenNameRequired" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="TwitterScreenNameDoesNotExist"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="TwitterScreenNameDoesNotBelongToUser"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="TwitterScreenNameBelongsToAnotherUser"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="PostcodeMustBeProvided" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="PostcodeDoesNotHaveAnyStations"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="PostcodeNotAllowedForFromAndTo"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="InvalidPostcode" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="InvalidDateOfBirth" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="OperatorNotKnown" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="StaffMemberError" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="OJPOtherError" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="DeviceIdMissing" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="DeviceIdNotFound" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="RouteWithoutLegs" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="OriginOrDestinationSameAsVia" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="DuplicateRoute" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="InvalidLoraTimeSpan" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="OutwardMoreThan12WeeksInFuture"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="InwardMoreThan12WeeksInFuture"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="OutwardAfterInwardDate" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="DuplicateStations" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="SearchDateInThePast" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:complexType name="ReturnResponseType" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">The returned string may contain
+                        extra information.
+                    </xsd:documentation>
+                </xsd:annotation>
+                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:element name="response" type="ResponseEnum" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="responseDetails" type="xsd:string"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:simpleType name="OJPString" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:whiteSpace value="collapse" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:minLength value="1" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:maxLength value="255" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:complexType name="CrsCode" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:choice xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                        <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">CRS code of a station or station
+                            group
+                        </xsd:documentation>
+                    </xsd:annotation>
+                    <xsd:element name="stationCRS" type="StationCrs" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="groupCRS" type="GroupCrs" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:choice>
+            </xsd:complexType>
+            <xsd:complexType name="CrsNlcCode" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:choice xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                        <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">CRS code or NLC code of a
+                            station or station
+                            group
+                        </xsd:documentation>
+                    </xsd:annotation>
+                    <xsd:element name="stationCRS" type="StationCrs" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="groupCRS" type="GroupCrs" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="nlcCode" type="NLC" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:choice>
+            </xsd:complexType>
+            <xsd:simpleType name="StationCrs" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:pattern value="[A-Z0-9]{3}" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:complexType name="StationTime" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:element minOccurs="0" name="stationCRS" type="StationCrs"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="realTime" type="xsd:dateTime"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="scheduledTime" type="xsd:dateTime"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:simpleType name="GroupCrs" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:pattern value="[0-9]{1,3}" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:complexType name="Location" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:choice xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                        <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">Postcode or a CrsCode
+                        </xsd:documentation>
+                    </xsd:annotation>
+                    <xsd:element name="postcodeDetails" type="PostcodeDetails"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="station" type="CrsCode" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:choice>
+            </xsd:complexType>
+            <xsd:complexType name="PostcodeDetails" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:element name="postcode" type="PostcodeType" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element maxOccurs="3" minOccurs="0" name="stations" type="StationCrs"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:simpleType name="PostcodeType" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:pattern
+                            value="[A-PR-UWYZ0-9][A-HK-Y0-9][AEHMNPRTVXY0-9]?[ABEHMNPRVWXY0-9]? {0,1}[0-9][ABD-HJLN-UW-Z]{2}|GIR 0AA"
+                            xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="RailCardCode" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:minLength value="3" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:maxLength value="3" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="FareClassEnum" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:NMTOKEN" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:enumeration value="ANY" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="STANDARD" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="FIRST" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="FareCategoryEnum" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:NMTOKEN" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:enumeration value="ADVANCE" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="OFF-PEAK" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="ANYTIME" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="IntermediateEnumType" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">The type of intermediate the user
+                        wants.
+                    </xsd:documentation>
+                </xsd:annotation>
+                <xsd:restriction base="xsd:NMTOKEN" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:enumeration value="Via" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="Avoid" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="Interchange" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="ExcludeInterchange" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="MaxChanges" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:NMTOKEN" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:enumeration value="0" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="1" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="2" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="3" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="ANY" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="IncreaseInterchangeTime" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">The number of minutes the user wants
+                        to increase
+                        the interchange time.
+                    </xsd:documentation>
+                </xsd:annotation>
+                <xsd:restriction base="xsd:NMTOKEN" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:enumeration value="0" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="30" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="60" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="90" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="120" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:complexType name="PassengerCounts" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:element name="adult" type="PassengerCount" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="child" type="PassengerCount" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:simpleType name="PassengerCount" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:int" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:minInclusive value="0" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:maxInclusive value="8" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:complexType name="Station" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:element name="name" type="StationOrGroupName" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="crs" type="StationCrs" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="nlc" type="NLC" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="tiploc" type="Tiploc"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="probability" type="ProbabilityWeighting"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:complexType name="StationGroup" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:element name="name" type="StationOrGroupName" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="crs" type="GroupCrs" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element maxOccurs="unbounded" name="station" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                        <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                            <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                <xsd:element name="name" type="StationOrGroupName"
+                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                <xsd:element name="crs" type="StationCrs" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                <xsd:element minOccurs="0" name="nlc" type="NLC"
+                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                <xsd:element minOccurs="0" name="tiploc" type="Tiploc"
+                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                            </xsd:sequence>
+                        </xsd:complexType>
+                    </xsd:element>
+                    <xsd:element name="probability" type="ProbabilityWeighting"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:simpleType name="TravelModeEnum" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:NMTOKEN" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:enumeration value="SCHEDULED_BUS" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="REPLACEMENT_BUS" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="TRAIN" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="FERRY" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="WALK" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="UNDERGROUND" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="TAXI" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="METRO" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="TRAMLINK" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="PLATFORM_CHANGE" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="CHECK_IN_TIME" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="HOVERCRAFT" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="TRANSFER" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="TRAM" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="DLR" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="LU" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="DLR_LU" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="WALK_TUBE" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="WALK_DLR" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="WALK_TUBE_DLR" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="AdultOrChildEnum" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:NMTOKEN" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:enumeration value="ADULT" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="CHILD" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="FareDirectionEnum" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:NMTOKEN" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:enumeration value="OUTWARD" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="INWARD" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="RETURN" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="OTHER" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="FareSearchStrategyEnum" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:NMTOKEN" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:enumeration value="FASTEST" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="CHEAPEST" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="StationOrGroupName" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:minLength value="0" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:maxLength value="255" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="FareDescription" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:minLength value="0" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:maxLength value="255" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:complexType name="Fare" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:element name="id" type="Id" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="description" type="FareDescription"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="totalPrice" type="PriceInPence" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="undiscountedPrices" type="Prices" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="typeCode" type="FareCode" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="fareClass" type="FareClassEnum" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="fareCategory" type="FareCategoryEnum"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="routeCode" type="RouteCode" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="fareSetter" type="FareSetter"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="startLegId" type="Id" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="endLegId" type="Id" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="originNlc" type="NLC"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="destinationNlc" type="NLC"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="fareType" type="FareType"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="direction" type="FareDirectionEnum"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="canCrossLondon" type="xsd:boolean"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="adultStatusCode" type="PassengerStatusCodeType"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="childStatusCode" type="PassengerStatusCodeType"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="ticketRestriction" type="TicketRestrictionType"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="utsZones" type="xsd:nonNegativeInteger"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="individualFare" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                        <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                            <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                <xsd:element name="prices" type="Prices" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                <xsd:element name="accompaniedPrices" type="Prices"
+                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                <xsd:element name="passengers" type="PassengerCounts"
+                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                <xsd:element name="accompaniedPassengers" type="PassengerCounts"
+                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                            </xsd:sequence>
+                        </xsd:complexType>
+                    </xsd:element>
+                    <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                        <xsd:element maxOccurs="unbounded" minOccurs="0" name="railcardFare"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                            <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                    <xsd:element name="code" type="RailCardCode"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:element name="count" type="xsd:int"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:element name="prices" type="Prices"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:element name="passengers" type="PassengerCounts"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:element minOccurs="0" name="adultStatusCode" type="PassengerStatusCodeType"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                    <xsd:element minOccurs="0" name="childStatusCode" type="PassengerStatusCodeType"
+                                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                </xsd:sequence>
+                            </xsd:complexType>
+                        </xsd:element>
+                    </xsd:sequence>
+                    <xsd:element minOccurs="0" name="groupFare" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                        <xsd:complexType xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                            <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                                <xsd:element name="price" type="PriceInPence"
+                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                                <xsd:element name="noOfTickets" type="xsd:int"
+                                             xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                            </xsd:sequence>
+                        </xsd:complexType>
+                    </xsd:element>
+                    <xsd:element maxOccurs="unbounded" minOccurs="0" name="invalidFareComponent" type="Fare"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:simpleType name="PassengerStatusCodeType" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:minLength value="3" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:maxLength value="3" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="Tiploc" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:minLength value="0" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:maxLength value="7" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="NLC" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:minLength value="0" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:maxLength value="4" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="FareType" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:NMTOKEN" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:enumeration value="SMARTCARDS" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="OPAYG" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="TRAVELCARDS" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="ProbabilityWeighting" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:float" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:minInclusive value="0" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:maxInclusive value="1" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="Distance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:int" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:minInclusive value="0" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="FareCode" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:minLength value="0" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:maxLength value="3" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="FareSetter" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:minLength value="0" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:maxLength value="3" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="RouteCode" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:minLength value="0" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:maxLength value="5" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:complexType name="Operator" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:element name="code" type="OperatorCode" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="mode" type="OperatorMode" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:complexType name="OperatorDetails" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:element name="code" type="OperatorCode" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="name" type="OJPString" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:simpleType name="OperatorCode" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:minLength value="0" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:maxLength value="2" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="OperatorMode" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:NMTOKEN" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:enumeration value="SHOW" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="DONT_SHOW" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:complexType name="Prices" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:element name="adult" type="PriceInPence" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="child" type="PriceInPence" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:simpleType name="PriceInPence" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:int" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+            </xsd:simpleType>
+            <xsd:simpleType name="Platform" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:minLength value="1" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:maxLength value="3" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="TicketRestrictionType" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:pattern value="(.{0})|(.{2})" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:complexType name="TimetableInformationType" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:element name="scheduled" type="ScheduledInformationType"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="realtime" type="RealTimeInformationType"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:complexType name="ScheduledInformationType" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:element minOccurs="0" name="departure" type="xsd:dateTime"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="arrival" type="xsd:dateTime"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:complexType name="RealTimeInformationType" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:element minOccurs="0" name="departure" type="xsd:dateTime"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="arrival" type="xsd:dateTime"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:simpleType name="RealtimeEnquiryType" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:NMTOKEN" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:enumeration value="STANDARD" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="CHECK_ALTERNATIVES" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="RealtimeClassification" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:NMTOKEN" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:enumeration value="SERIOUSLY_DISRUPTED" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="BROKEN_UNREPAIRABLE" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="BROKEN" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="DELAYED" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="CANCELLED" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="MISSED_CONNECTION" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="ONTIME" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="NORMAL" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="DELAYED_INDETERMINATE" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="SERIOUSLY_DISRUPTED_INDETERMINATE"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="LEG_DELAYED_INDETERMINATE" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="ON_TIME_INDETERMINATE" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="StoppingPatternType" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:NMTOKEN" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:enumeration value="DEPART" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="ARRIVE" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="BOTH" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="StationType" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:NMTOKEN" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:enumeration value="NR" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="DLR" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="LU" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="UpdatedTimeType" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:NMTOKEN" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:enumeration value="ESTIMATE" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="ACTUAL" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="UNCERTAIN" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:complexType name="StationJourneyDetail" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:annotation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:documentation xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                        Journey details for a station provided in a
+                        DepartureBoardRequest. Realtime departure/arrival
+                        information and the
+                        Platform Number will only be returned if available.
+                    </xsd:documentation>
+                </xsd:annotation>
+                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:element name="originStation" type="StationCrs" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="destinationStation" type="StationCrs"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="timetable" type="TimetableInformationType"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element minOccurs="0" name="platform" type="Platform"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:complexType name="UndergroundTravelInformation" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:element maxOccurs="unbounded" name="message" type="xsd:string"
+                                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:complexType name="ServiceBulletin" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:sequence xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:element name="title" type="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="description" type="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="url" type="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="disruption" type="xsd:boolean" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="alert" type="xsd:boolean" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:element name="cleared" type="xsd:boolean" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:simpleType name="ServicesOmittedInteger" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:integer" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:minInclusive value="0" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:maxInclusive value="100" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="Id" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:int" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:minInclusive value="1" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="CallingPointsSearchStatus" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:NMTOKEN" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:enumeration value="Ok" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="Underground" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="UnableToRetrieveCallingPoints"
+                                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="AssociationType" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:NMTOKEN" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:enumeration value="SPLIT" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:enumeration value="JOIN" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="RarsDescription" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                <xsd:restriction base="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                    <xsd:minLength value="0" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                    <xsd:maxLength value="255" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+        </xsd:schema>
+    </wsdl:types>
+    <wsdl:message name="DepartureBoardResponse">
+        <wsdl:part element="sch0:DepartureBoardResponse" name="DepartureBoardResponse"/>
+    </wsdl:message>
+    <wsdl:message name="RealtimeCallingPointsResponse">
+        <wsdl:part element="sch0:RealtimeCallingPointsResponse" name="RealtimeCallingPointsResponse"/>
+    </wsdl:message>
+    <wsdl:message name="DepartureBoardFault">
+        <wsdl:part element="sch0:DepartureBoardFault" name="DepartureBoardFault"/>
+    </wsdl:message>
+    <wsdl:message name="RealtimeCallingPointsFault">
+        <wsdl:part element="sch0:RealtimeCallingPointsFault" name="RealtimeCallingPointsFault"/>
+    </wsdl:message>
+    <wsdl:message name="RealtimeJourneyPlanRequest">
+        <wsdl:part element="sch0:RealtimeJourneyPlanRequest" name="RealtimeJourneyPlanRequest"/>
+    </wsdl:message>
+    <wsdl:message name="RealtimeJourneyPlanFault">
+        <wsdl:part element="sch0:RealtimeJourneyPlanFault" name="RealtimeJourneyPlanFault"/>
+    </wsdl:message>
+    <wsdl:message name="RealtimeCallingPointsRequest">
+        <wsdl:part element="sch0:RealtimeCallingPointsRequest" name="RealtimeCallingPointsRequest"/>
+    </wsdl:message>
+    <wsdl:message name="DepartureBoardRequest">
+        <wsdl:part element="sch0:DepartureBoardRequest" name="DepartureBoardRequest"/>
+    </wsdl:message>
+    <wsdl:message name="RealtimeJourneyPlanResponse">
+        <wsdl:part element="sch0:RealtimeJourneyPlanResponse" name="RealtimeJourneyPlanResponse"/>
+    </wsdl:message>
+    <wsdl:portType name="jpservices">
+        <wsdl:operation name="DepartureBoard">
+            <wsdl:input message="tns:DepartureBoardRequest" name="DepartureBoardRequest"/>
+            <wsdl:output message="tns:DepartureBoardResponse" name="DepartureBoardResponse"/>
+            <wsdl:fault message="tns:DepartureBoardFault" name="DepartureBoardFault"/>
+        </wsdl:operation>
+        <wsdl:operation name="RealtimeCallingPoints">
+            <wsdl:input message="tns:RealtimeCallingPointsRequest" name="RealtimeCallingPointsRequest"/>
+            <wsdl:output message="tns:RealtimeCallingPointsResponse" name="RealtimeCallingPointsResponse"/>
+            <wsdl:fault message="tns:RealtimeCallingPointsFault" name="RealtimeCallingPointsFault"/>
+        </wsdl:operation>
+        <wsdl:operation name="RealtimeJourneyPlan">
+            <wsdl:input message="tns:RealtimeJourneyPlanRequest" name="RealtimeJourneyPlanRequest"/>
+            <wsdl:output message="tns:RealtimeJourneyPlanResponse" name="RealtimeJourneyPlanResponse"/>
+            <wsdl:fault message="tns:RealtimeJourneyPlanFault" name="RealtimeJourneyPlanFault"/>
+        </wsdl:operation>
+    </wsdl:portType>
+    <wsdl:binding name="jpservicesBinding" type="tns:jpservices">
+        <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+        <wsdl:operation name="DepartureBoard">
+            <soap:operation soapAction=""/>
+            <wsdl:input name="DepartureBoardRequest">
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output name="DepartureBoardResponse">
+                <soap:body use="literal"/>
+            </wsdl:output>
+            <wsdl:fault name="DepartureBoardFault">
+                <soap:fault name="DepartureBoardFault" use="literal"/>
+            </wsdl:fault>
+        </wsdl:operation>
+        <wsdl:operation name="RealtimeCallingPoints">
+            <soap:operation soapAction=""/>
+            <wsdl:input name="RealtimeCallingPointsRequest">
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output name="RealtimeCallingPointsResponse">
+                <soap:body use="literal"/>
+            </wsdl:output>
+            <wsdl:fault name="RealtimeCallingPointsFault">
+                <soap:fault name="RealtimeCallingPointsFault" use="literal"/>
+            </wsdl:fault>
+        </wsdl:operation>
+        <wsdl:operation name="RealtimeJourneyPlan">
+            <soap:operation soapAction=""/>
+            <wsdl:input name="RealtimeJourneyPlanRequest">
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output name="RealtimeJourneyPlanResponse">
+                <soap:body use="literal"/>
+            </wsdl:output>
+            <wsdl:fault name="RealtimeJourneyPlanFault">
+                <soap:fault name="RealtimeJourneyPlanFault" use="literal"/>
+            </wsdl:fault>
+        </wsdl:operation>
+    </wsdl:binding>
+    <wsdl:service name="NreOJPService">
+        <wsdl:port binding="tns:jpservicesBinding" name="NreOJPPort">
+            <soap:address location="http://ojp.nationalrail.co.uk/webservices"/>
+        </wsdl:port>
+    </wsdl:service>
+</wsdl:definitions>

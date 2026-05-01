@@ -30,3 +30,6 @@ python-dotenv
 
 # Visualization
 matplotlib
+
+# SOAP — National Rail OJP (jpservices.wsdl)
+zeep
