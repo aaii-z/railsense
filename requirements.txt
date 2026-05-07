@@ -12,7 +12,6 @@ sentence-transformers
 scikit-learn
 pandas
 numpy
-joblib
 
 # Document parsing - Task 3 KB
 python-pptx
@@ -20,10 +19,6 @@ python-docx
 
 # Task 1 - ticket search
 requests
-beautifulsoup4
-
-# Deep learning - tiny GPT
-torch
 
 # Utils
 python-dotenv
@@ -31,5 +26,11 @@ python-dotenv
 # Visualization
 matplotlib
 
-# SOAP — National Rail OJP (jpservices.wsdl)
+# SOAP - National Rail OJP (jpservices.wsdl)
 zeep
+
+
+ollama
+rapidfuzz
+torch
+torchvision

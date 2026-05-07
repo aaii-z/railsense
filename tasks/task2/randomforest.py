@@ -2,17 +2,17 @@ import pickle
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import GroupShuffleSplit, RandomizedSearchCV
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
-import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from preprocessing import run_preprocessing, FEATURE_COLS
+from tasks.task2.preprocessing import run_preprocessing, FEATURE_COLS
 
-DATA_DIR = "../../data/raw/"
-SAVE_DIR = "../../models/task2/"
-PLOT_DIR = "../../models/task2/plots/"
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+DATA_DIR = str(_REPO_ROOT / "data" / "raw")
+SAVE_DIR = str(_REPO_ROOT / "models" / "task2")
+PLOT_DIR = str(_REPO_ROOT / "models" / "task2" / "plots")
 
 
 def train_with_tuning(X_train, y_train):
@@ -25,7 +25,7 @@ def train_with_tuning(X_train, y_train):
     search = RandomizedSearchCV(
         rf,
         param_distributions=param_dist,
-        n_iter=6,       # try 6 combinations
+        n_iter=6,
         cv=3,
         scoring="neg_mean_absolute_error",
         random_state=42,
@@ -77,7 +77,7 @@ def plot_residuals(y_test, y_pred, plot_dir):
     axes[1].set_ylabel("Count")
     axes[1].set_title("Residuals Distribution", fontweight="bold")
 
-    plt.suptitle("Random Forest — Model Evaluation", fontsize=13, fontweight="bold")
+    plt.suptitle("Random Forest - Model Evaluation", fontsize=13, fontweight="bold")
     plt.tight_layout()
     plt.savefig(os.path.join(plot_dir, "rf_residuals.png"), dpi=150)
     plt.close()
@@ -92,7 +92,7 @@ def plot_feature_importances(model, plot_dir):
 
     fig, ax = plt.subplots(figsize=(9, 5))
     ax.bar(sorted_names, sorted_vals, color="#9b59b6", edgecolor="white")
-    ax.set_title("Feature Importances — Random Forest", fontweight="bold")
+    ax.set_title("Feature Importances - Random Forest", fontweight="bold")
     ax.set_ylabel("Importance")
     ax.set_xlabel("Feature")
     plt.xticks(rotation=30, ha="right")
