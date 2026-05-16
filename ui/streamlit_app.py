@@ -1,6 +1,7 @@
 import streamlit as st
 import sys
 import uuid
+from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -41,6 +42,8 @@ for msg in st.session_state.messages:
             if debug:
                 with st.expander("Debug details"):
                     st.json(debug)
+        if msg.get("timestamp"):
+            st.caption(msg["timestamp"])
 
 def handle_chat_submit():
     # The callback is triggered by the widget with the current key
@@ -76,19 +79,47 @@ if st.session_state.get("last_transcription"):
 if st.session_state.text_to_process:
     text_to_process = st.session_state.text_to_process
     st.session_state.text_to_process = None
-    st.session_state.messages.append({"role": "user", "content": text_to_process})
-    try:
+
+    user_ts = datetime.now().strftime("%H:%M:%S")
+    st.session_state.messages.append({
+        "role": "user",
+        "content": text_to_process,
+        "timestamp": user_ts,
+    })
+
+    # Render user message immediately so it's visible during "Thinking..."
+    with st.chat_message("user"):
+        st.write(text_to_process)
+        st.caption(user_ts)
+
+    # Render assistant bubble with spinner inside it
+    with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            response = handle_message(text_to_process, st.session_state.dialogue_state)
-    except Exception as exc:
-        response = {"message": f"Unexpected UI error while generating a reply: {exc}"}
-    st.session_state.messages.append(
-        {
-            "role": "assistant",
-            "content": response["message"],
-            "journeys": response.get("journeys"),
-            "prediction": response.get("prediction"),
-            "debug": response.get("debug"),
-        }
-    )
+            try:
+                response = handle_message(text_to_process, st.session_state.dialogue_state)
+            except Exception as exc:
+                response = {"message": f"Unexpected UI error while generating a reply: {exc}"}
+
+        st.write(response["message"])
+        journeys = response.get("journeys")
+        prediction = response.get("prediction")
+        debug = response.get("debug")
+        if journeys:
+            st.dataframe(journeys, use_container_width=True)
+        if prediction:
+            st.json(prediction)
+        if debug:
+            with st.expander("Debug details"):
+                st.json(debug)
+        bot_ts = datetime.now().strftime("%H:%M:%S")
+        st.caption(bot_ts)
+
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": response["message"],
+        "journeys": journeys,
+        "prediction": prediction,
+        "debug": debug,
+        "timestamp": bot_ts,
+    })
     st.rerun()
