@@ -1,5 +1,4 @@
-import ollama
-from llm.client import MODEL
+from llm.client import chat_text
 from tasks.task3.retriever import retrieve, format_context
 
 
@@ -33,8 +32,7 @@ def answer_general_query(
         "content": f"Context from disruption plans:\n{context}\n\nQuestion: {user_input}"
     })
 
-    response = ollama.chat(model=MODEL, messages=messages)
-    answer   = response["message"]["content"].strip()
+    answer = chat_text(messages).strip()
 
     if return_debug:
         return answer, {

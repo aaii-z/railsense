@@ -33,7 +33,7 @@ matplotlib
 zeep
 
 
-ollama
+openai
 rapidfuzz
 torch
 torchvision

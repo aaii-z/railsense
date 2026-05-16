@@ -4,10 +4,9 @@ import re
 from datetime import datetime, timezone
 
 import requests
-import ollama
 from zeep.exceptions import Error as ZeepError
 
-from llm.client import MODEL
+from llm.client import chat_text
 from tasks.task1.ticket_finder import default_ticket_state, handle_ticket_message
 from tasks.task2.predictor import default_delay_state, handle_delay_message
 from tasks.task3.llm import answer_general_query
@@ -62,11 +61,7 @@ User message: "{user_input}"
 Reply with exactly one word only: ticket_search, delay_prediction, or general."""
 
     try:
-        response = ollama.chat(
-            model=MODEL,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        intent = response["message"]["content"].strip().lower()
+        intent = chat_text([{"role": "user", "content": prompt}]).strip().lower()
         if intent in {"delay_prediction", "ticket_search", "general"}:
             return intent
         return "general"
