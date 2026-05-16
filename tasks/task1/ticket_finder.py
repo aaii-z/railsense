@@ -49,20 +49,39 @@ _CITY_PRIORITY: dict[str, list[str]] = {
 }
 
 
+class StationAmbiguous(Exception):
+    def __init__(self, candidates: list[str]):
+        self.candidates = candidates
+
+
 def resolve_station(user_input: str) -> list[str]:
     """Fuzzy match user input to city or station name. Returns CRS codes."""
     query = user_input.strip().lower()
 
-    # Check priority overrides first
     if query in _CITY_PRIORITY:
         return _CITY_PRIORITY[query][:MAX_STATIONS]
 
     if query in STATION_LOOKUP:
         return STATION_LOOKUP[query][:MAX_STATIONS]
-    match, score, _ = process.extractOne(query, STATION_LOOKUP.keys())
-    if score >= 75:
-        return STATION_LOOKUP[match][:MAX_STATIONS]
-    return []
+
+    matches = process.extract(query, STATION_LOOKUP.keys(), limit=2)
+    if not matches or matches[0][1] < 50:
+        return []
+
+    top_name, top_score, _ = matches[0]
+
+    if top_score >= 75:
+        if top_name in _CITY_PRIORITY:
+            return _CITY_PRIORITY[top_name][:MAX_STATIONS]
+        return STATION_LOOKUP[top_name][:1]
+
+    # Low confidence — if a second candidate is within 5 points, ask the user
+    if len(matches) >= 2 and matches[1][1] >= top_score - 5:
+        raise StationAmbiguous([matches[0][0].title(), matches[1][0].title()])
+
+    if top_name in _CITY_PRIORITY:
+        return _CITY_PRIORITY[top_name][:MAX_STATIONS]
+    return STATION_LOOKUP[top_name][:1]
 
 
 
@@ -236,6 +255,7 @@ def _format_journey(journey: dict, depart_by: datetime, is_return: bool) -> dict
         "price":       f"£{pence / 100:.2f}" if pence else "-",
         "link":        _booking_link(origin, destination, link_time, is_return),
         "pence":       pence or float("inf"),
+        "dep_dt":      link_time,
     }
 
 
@@ -278,8 +298,27 @@ def handle_ticket_message(user_input: str, state: dict[str, Any], *, debug: bool
         return resp
 
     # Step 3 - resolve city names to CRS codes
-    origin_codes = resolve_station(str(state["origin"]))
-    dest_codes   = resolve_station(str(state["destination"]))
+    try:
+        origin_codes = resolve_station(str(state["origin"]))
+    except StationAmbiguous as e:
+        state["origin"] = None
+        opts = " or ".join(e.candidates)
+        resp = {"kind": "ticket_search", "done": False,
+                "message": f"Did you mean {opts}? Please clarify your departure station."}
+        if debug:
+            resp["ticket_debug"] = {**dbg, "step": "station_ambiguous", "field": "origin", "candidates": e.candidates}
+        return resp
+
+    try:
+        dest_codes = resolve_station(str(state["destination"]))
+    except StationAmbiguous as e:
+        state["destination"] = None
+        opts = " or ".join(e.candidates)
+        resp = {"kind": "ticket_search", "done": False,
+                "message": f"Did you mean {opts}? Please clarify your destination station."}
+        if debug:
+            resp["ticket_debug"] = {**dbg, "step": "station_ambiguous", "field": "destination", "candidates": e.candidates}
+        return resp
     dbg["origin_input"]   = state["origin"]
     dbg["origin_crs"]     = origin_codes
     dbg["dest_input"]     = state["destination"]
@@ -341,8 +380,14 @@ def handle_ticket_message(user_input: str, state: dict[str, Any], *, debug: bool
             resp["ticket_debug"] = dbg
         return resp
 
-    # Step 6 - sort by price, take top 5, format output
-    top5 = sorted(all_journeys, key=lambda j: j["pence"])[:5]
+    # Step 6 - prefer journeys within ±3 h of requested departure, then sort by price
+    window = timedelta(hours=3)
+    in_window = [
+        j for j in all_journeys
+        if abs((j["dep_dt"] - depart_by).total_seconds()) <= window.total_seconds()
+    ]
+    pool = in_window if in_window else all_journeys
+    top5 = sorted(pool, key=lambda j: j["pence"])[:5]
 
     lines = [
         f"{i}. {j['origin']} → {j['destination']} | dep {j['departure']} arr {j['arrival']} | from {j['price']} — [Book ticket]({j['link']})"
@@ -359,7 +404,7 @@ def handle_ticket_message(user_input: str, state: dict[str, Any], *, debug: bool
         "kind":     "ticket_search",
         "done":     True,
         "message":  prefix + "\n".join(lines),
-        "journeys": [{k: v for k, v in j.items() if k != "pence"} for j in top5],
+        "journeys": [{k: v for k, v in j.items() if k not in ("pence", "dep_dt")} for j in top5],
     }
     if debug:
         dbg["step"] = "success"
