@@ -329,12 +329,12 @@ def handle_ticket_message(user_input: str, state: dict[str, Any], *, debug: bool
         dbg["step"] = "api_fallback"
         outbound = _booking_link(origin_codes[0], dest_codes[0], depart_by, is_return=inward_time is not None)
         msg = (
-            f"I couldn't retrieve live fares right now, but here is the National Rail "
-            f"journey planner link for your trip, prices and booking are available there:\n{outbound}"
+            f"I couldn't retrieve live fares right now, but you can check prices and book here: "
+            f"[National Rail journey planner]({outbound})"
         )
         if inward_time:
             inbound = _booking_link(dest_codes[0], origin_codes[0], inward_time, is_return=True)
-            msg += f"\n\nReturn journey:\n{inbound}"
+            msg += f"\n\nReturn journey: [National Rail journey planner]({inbound})"
         state.update(default_ticket_state())
         resp = {"kind": "ticket_search", "done": True, "message": msg, "journeys": []}
         if debug:
@@ -345,8 +345,7 @@ def handle_ticket_message(user_input: str, state: dict[str, Any], *, debug: bool
     top5 = sorted(all_journeys, key=lambda j: j["pence"])[:5]
 
     lines = [
-        f"{i}. {j['origin']} → {j['destination']} | dep {j['departure']} arr {j['arrival']} | from {j['price']}\n"
-        f"   Book: {j['link']}"
+        f"{i}. {j['origin']} → {j['destination']} | dep {j['departure']} arr {j['arrival']} | from {j['price']} — [Book ticket]({j['link']})"
         for i, j in enumerate(top5, 1)
     ]
 
