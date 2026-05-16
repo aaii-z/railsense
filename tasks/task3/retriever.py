@@ -22,7 +22,7 @@ def retrieve(query: str, top_k: int = 5, station: str = None) -> list[dict]:
             if station:
                 cursor.execute(
                     """
-                    SELECT station, region, section, chunk_text,
+                    SELECT station, region, doc_date, section, chunk_text,
                            1 - (embedding <=> %s::vector) AS score
                     FROM documents
                     WHERE station ILIKE %s
@@ -34,7 +34,7 @@ def retrieve(query: str, top_k: int = 5, station: str = None) -> list[dict]:
             else:
                 cursor.execute(
                     """
-                    SELECT station, region, section, chunk_text,
+                    SELECT station, region, doc_date, section, chunk_text,
                            1 - (embedding <=> %s::vector) AS score
                     FROM documents
                     ORDER BY embedding <=> %s::vector
@@ -52,9 +52,10 @@ def retrieve(query: str, top_k: int = 5, station: str = None) -> list[dict]:
         {
             "station":    row[0],
             "region":     row[1],
-            "section":    row[2],
-            "chunk_text": row[3],
-            "score":      round(float(row[4]), 4),
+            "doc_date":   row[2],
+            "section":    row[3],
+            "chunk_text": row[4],
+            "score":      round(float(row[5]), 4),
         }
         for row in rows
     ]
@@ -66,3 +67,15 @@ def format_context(chunks: list[dict]) -> str:
         header = f"[{c['station']}, {c['section']}]"
         parts.append(f"{header}\n{c['chunk_text']}")
     return "\n\n".join(parts)
+
+
+def format_sources(chunks: list[dict]) -> str:
+    seen = set()
+    sources = []
+    for c in chunks:
+        key = (c["station"], c["region"], c["doc_date"])
+        if key not in seen:
+            seen.add(key)
+            date = f", {c['doc_date']}" if c["doc_date"] else ""
+            sources.append(f"- {c['station']} Station Disruption Plan ({c['region']}{date})")
+    return "\n".join(sources)
