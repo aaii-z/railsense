@@ -9,7 +9,7 @@ from zeep.exceptions import Error as ZeepError
 from llm.client import chat_text
 from tasks.task1.ticket_finder import default_ticket_state, handle_ticket_message
 from tasks.task2.predictor import default_delay_state, handle_delay_message
-from tasks.task3.llm import answer_general_query
+from tasks.task3.llm import answer_contingency_query
 
 _TICKET_RE = re.compile(
     r"\b(ticket|tickets|fare|fares|book(?:ing)?|travel(?:ling)?|journey|trip|"
@@ -51,20 +51,20 @@ def _detect_intent(user_input: str, history: list, active_task: str | None = Non
     prompt = f"""You are a railway assistant chatbot with three capabilities:
 1. ticket_search, help a user find and book the cheapest train ticket (journey planning, fares, travel dates)
 2. delay_prediction, predict how late a delayed train will arrive at its destination
-3. general, answer staff/passenger questions about contingency plans, policies, or station information
+3. contingency, support operational staff with step-by-step guidance on handling disruptions, emergencies, or station contingency plans
 
-Classify this message as exactly one of: ticket_search, delay_prediction, general.
+Classify this message as exactly one of: ticket_search, delay_prediction, contingency.
 {ongoing}
 Recent conversation: {recent}
 User message: "{user_input}"
 
-Reply with exactly one word only: ticket_search, delay_prediction, or general."""
+Reply with exactly one word only: ticket_search, delay_prediction, or contingency."""
 
     try:
         intent = chat_text([{"role": "user", "content": prompt}]).strip().lower()
-        if intent in {"delay_prediction", "ticket_search", "general"}:
+        if intent in {"delay_prediction", "ticket_search", "contingency"}:
             return intent
-        return "general"
+        return "contingency"
     except Exception:
         return "general"
 
@@ -81,7 +81,7 @@ def _build_debug_block(
         task_state = {k: v for k, v in ticket_state_snapshot.items() if v is not None}
     elif intent == "delay_prediction":
         task_state = {k: v for k, v in state["delay_state"].items() if v is not None}
-    else:
+    else:  # contingency
         task_state = {}
     block = {
         "intent": intent,
@@ -116,11 +116,11 @@ def handle_message(user_input: str, state: dict[str, Any]) -> dict[str, Any]:
 
         else:
             state["active_task"] = None
-            general_result = answer_general_query(
+            contingency_result = answer_contingency_query(
                 user_input, history=state["history"], return_debug=debug_mode
             )
-            answer = general_result[0] if debug_mode else general_result
-            response = {"kind": "general", "done": True, "message": answer}
+            answer = contingency_result[0] if debug_mode else contingency_result
+            response = {"kind": "contingency", "done": True, "message": answer}
 
     except requests.RequestException as exc:
         response = {"kind": intent, "done": False,
