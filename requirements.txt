@@ -1,6 +1,9 @@
 # UI
 streamlit
 
+# Voice
+openai-whisper
+
 # Database
 psycopg2-binary
 pgvector

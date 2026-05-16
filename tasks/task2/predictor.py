@@ -11,7 +11,7 @@ import traceback
 import numpy as np
 
 from tasks.task2.preprocessing import ROUTE, parse_time_to_minutes
-from tasks.task3.llm import chat_json
+from llm.client import chat_json
 
 
 TARGET_COLS = [

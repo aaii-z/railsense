@@ -7,7 +7,7 @@ from rapidfuzz import process
 from zeep.helpers import serialize_object
 
 from rtjp.client import create_client
-from tasks.task3.llm import chat_json
+from llm.client import chat_json
 
 
 def _load_station_lookup(

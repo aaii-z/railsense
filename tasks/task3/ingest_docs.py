@@ -1,4 +1,3 @@
-import os
 import re
 import psycopg2
 from pathlib import Path
@@ -7,7 +6,8 @@ from pptx import Presentation
 from pgvector.psycopg2 import register_vector
 from sentence_transformers import SentenceTransformer
 
-DB_URL   = os.environ.get("DATABASE_URL", "postgresql://railsense:railsense@localhost:5432/railsense")
+from db import DB_URL
+
 DOCS_DIR = Path(__file__).resolve().parents[2] / "data" / "docs"
 CHUNK_SIZE    = 400   # words per chunk
 CHUNK_OVERLAP = 50    # words overlap between chunks

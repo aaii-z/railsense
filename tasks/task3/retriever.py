@@ -1,37 +1,22 @@
-import os
-import threading
-import psycopg2
-import psycopg2.pool
-from pgvector.psycopg2 import register_vector
 from sentence_transformers import SentenceTransformer
 
-DB_URL = os.environ.get("DATABASE_URL", "postgresql://railsense:railsense@localhost:5432/railsense")
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
+from db import get_conn, put_conn
 
-_pool: psycopg2.pool.ThreadedConnectionPool | None = None
-_pool_lock = threading.Lock()
+_embedder: SentenceTransformer | None = None
 
 
-def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
-    global _pool
-    if _pool is None:
-        with _pool_lock:
-            if _pool is None:
-                _pool = psycopg2.pool.ThreadedConnectionPool(1, 10, DB_URL)
-    return _pool
+def _get_embedder() -> SentenceTransformer:
+    global _embedder
+    if _embedder is None:
+        _embedder = SentenceTransformer("all-MiniLM-L6-v2")
+    return _embedder
 
 
 def retrieve(query: str, top_k: int = 5, station: str = None) -> list[dict]:
-    """
-    Search pgvector for chunks relevant to the query.
-    Optionally filter by station name for more precise results.
-    """
-    embedding = embedder.encode(query).tolist()
+    embedding = _get_embedder().encode(query).tolist()
 
-    pool = _get_pool()
-    conn = pool.getconn()
+    conn = get_conn()
     try:
-        register_vector(conn)
         cursor = conn.cursor()
         try:
             if station:
@@ -61,7 +46,7 @@ def retrieve(query: str, top_k: int = 5, station: str = None) -> list[dict]:
         finally:
             cursor.close()
     finally:
-        pool.putconn(conn)
+        put_conn(conn)
 
     return [
         {
@@ -76,7 +61,6 @@ def retrieve(query: str, top_k: int = 5, station: str = None) -> list[dict]:
 
 
 def format_context(chunks: list[dict]) -> str:
-    """Format retrieved chunks into a context string for Gemma."""
     parts = []
     for c in chunks:
         header = f"[{c['station']}, {c['section']}]"

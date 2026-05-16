@@ -7,11 +7,10 @@ import requests
 import ollama
 from zeep.exceptions import Error as ZeepError
 
+from llm.client import MODEL
 from tasks.task1.ticket_finder import default_ticket_state, handle_ticket_message
 from tasks.task2.predictor import default_delay_state, handle_delay_message
 from tasks.task3.llm import answer_general_query
-
-LLM_MODEL = os.environ.get("LLM_MODEL", "gemma3")
 
 _TICKET_RE = re.compile(
     r"\b(ticket|tickets|fare|fares|book(?:ing)?|travel(?:ling)?|journey|trip|"
@@ -64,7 +63,7 @@ Reply with exactly one word only: ticket_search, delay_prediction, or general.""
 
     try:
         response = ollama.chat(
-            model=LLM_MODEL,
+            model=MODEL,
             messages=[{"role": "user", "content": prompt}]
         )
         intent = response["message"]["content"].strip().lower()
@@ -73,6 +72,35 @@ Reply with exactly one word only: ticket_search, delay_prediction, or general.""
         return "general"
     except Exception:
         return "general"
+
+
+def _build_debug_block(
+    intent: str,
+    state: dict[str, Any],
+    response: dict[str, Any],
+    user_input: str,
+    started_at: str,
+    ticket_state_snapshot: dict[str, Any],
+) -> dict[str, Any]:
+    if intent == "ticket_search":
+        task_state = {k: v for k, v in ticket_state_snapshot.items() if v is not None}
+    elif intent == "delay_prediction":
+        task_state = {k: v for k, v in state["delay_state"].items() if v is not None}
+    else:
+        task_state = {}
+    block = {
+        "intent": intent,
+        "active_task": state.get("active_task"),
+        "extracted_fields": task_state,
+        "started_at_utc": started_at,
+        "finished_at_utc": datetime.now(timezone.utc).isoformat(),
+        "user_input": user_input,
+    }
+    if "ticket_debug" in response:
+        block["ticket"] = response.pop("ticket_debug")
+    if "delay_debug" in response:
+        block["delay"] = response.pop("delay_debug")
+    return block
 
 
 def handle_message(user_input: str, state: dict[str, Any]) -> dict[str, Any]:
@@ -119,24 +147,9 @@ def handle_message(user_input: str, state: dict[str, Any]) -> dict[str, Any]:
         state["active_task"] = None
 
     if debug_mode:
-        task_state = {}
-        if intent == "ticket_search":
-            task_state = {k: v for k, v in _ticket_state_snapshot.items() if v is not None}
-        elif intent == "delay_prediction":
-            task_state = {k: v for k, v in state["delay_state"].items() if v is not None}
-        debug_block = {
-            "intent": intent,
-            "active_task": state.get("active_task"),
-            "extracted_fields": task_state,
-            "started_at_utc": started_at,
-            "finished_at_utc": datetime.now(timezone.utc).isoformat(),
-            "user_input": user_input,
-        }
-        if "ticket_debug" in response:
-            debug_block["ticket"] = response.pop("ticket_debug")
-        if "delay_debug" in response:
-            debug_block["delay"] = response.pop("delay_debug")
-        response["debug"] = debug_block
+        response["debug"] = _build_debug_block(
+            intent, state, response, user_input, started_at, _ticket_state_snapshot
+        )
 
     state["history"].append({"role": "user", "content": user_input})
     state["history"].append({"role": "assistant", "content": response["message"]})
