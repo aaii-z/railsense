@@ -1,3 +1,4 @@
+import base64
 import os
 import streamlit as st
 import sys
@@ -7,7 +8,13 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
+_TRAIN_ICON_PATH = _REPO_ROOT / "toy-train.png"
 load_dotenv(_REPO_ROOT / ".env")
+
+
+@st.cache_data
+def _train_icon_b64() -> str:
+    return base64.b64encode(_TRAIN_ICON_PATH.read_bytes()).decode()
 
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
@@ -19,7 +26,7 @@ from voice.transcriber import transcribe
 _STAFF_USERNAME = os.environ.get("STAFF_USERNAME", "staff")
 _STAFF_PASSWORD = os.environ.get("STAFF_PASSWORD", "railsense123")
 
-st.set_page_config(page_title="RailSense", page_icon="🚆", initial_sidebar_state="expanded")
+st.set_page_config(page_title="RailSense", page_icon=str(_TRAIN_ICON_PATH), initial_sidebar_state="expanded")
 
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
@@ -182,7 +189,12 @@ div[data-testid="stHorizontalBlock"]:first-of-type {
 
 col_title, col_auth = st.columns([5, 1])
 with col_title:
-    st.markdown("## 🚆 RailSense")
+    st.markdown(
+        f'<h2 style="display:flex;align-items:center;gap:10px;margin:0;">'
+        f'<img src="data:image/png;base64,{_train_icon_b64()}" width="36" height="36" style="display:inline-block;">'
+        f'RailSense</h2>',
+        unsafe_allow_html=True,
+    )
 with col_auth:
     if st.session_state.is_staff:
         st.markdown(

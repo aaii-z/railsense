@@ -33,6 +33,14 @@ _DELAY_RE = re.compile(
     r"predict\s+arrival|arrival\s+time)\b",
     re.IGNORECASE,
 )
+# Matches messages that are *only* a greeting (with optional punctuation),
+# not "hi, I want to book a ticket to London".
+_GREETING_ONLY_RE = re.compile(
+    r"^\s*(?:hi+|hai|hello+|hey+a?|heyo+|hiya|howdy|yo+|sup|greetings|"
+    r"good\s+(?:morning|afternoon|evening|day))"
+    r"[\s!.,?]*$",
+    re.IGNORECASE,
+)
 
 
 GREETING = (
@@ -151,6 +159,24 @@ def handle_message(
     is_staff: bool = False,
     session_id: str | None = None,
 ) -> dict[str, Any]:
+    # Greet back when the user only says "hi" / "hello" etc. so we don't jump
+    # straight into slot-filling like "origin and destination?". Don't gate on
+    # active_task: a misclassified earlier turn could trap them in slot-fill
+    # forever. The task state is preserved, so their next real message resumes.
+    if _GREETING_ONLY_RE.match(user_input):
+        greeting = STAFF_GREETING if is_staff else GREETING
+        state["history"].append({"role": "user", "content": user_input})
+        state["history"].append({"role": "assistant", "content": greeting})
+        if len(state["history"]) > 20:
+            state["history"] = state["history"][-20:]
+        if session_id:
+            try:
+                save_turn(session_id, "user", user_input, "greeting")
+                save_turn(session_id, "assistant", greeting, "greeting")
+            except Exception:
+                pass
+        return {"kind": "greeting", "done": True, "message": greeting}
+
     intent = _detect_intent(user_input, state["history"], state.get("active_task"))
 
     if is_staff and intent != "contingency":
