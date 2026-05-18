@@ -6,7 +6,7 @@ __pycache__/
 venv/
 env/
 models/
-data/
+#data/
 .ipynb_checkpoints/
 .DS_Store
 Thumbs.db
