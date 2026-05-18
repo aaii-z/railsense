@@ -1,4 +1,5 @@
 .env
+MarkSheets.pdf
 __pycache__/
 *.py[cod]
 .venv/

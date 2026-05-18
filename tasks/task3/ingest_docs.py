@@ -10,7 +10,7 @@ from db import DB_URL
 
 DOCS_DIR = Path(__file__).resolve().parents[2] / "data" / "docs"
 CHUNK_SIZE    = 400   # words per chunk
-CHUNK_OVERLAP = 50    # words overlap between chunks
+CHUNK_OVERLAP = 50    # overlap so we don't cut sentences in half
 
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -37,7 +37,7 @@ def extract_text_docx(path: Path) -> list[tuple[str, str]]:
     if buffer:
         sections.append((current_section, " ".join(buffer)))
 
-    # Also extract text from tables
+    # also pull text out of tables
     for table in doc.tables:
         table_text = []
         for row in table.rows:
@@ -79,11 +79,11 @@ def parse_filename(path: Path) -> tuple[str, str, str]:
     name   = path.stem
     region = path.parent.name
 
-    # Extract date e.g. "April 2018", "November 2020"
+    # date like "April 2018"
     date_match = re.search(r'(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}', name)
     doc_date = date_match.group(0) if date_match else ""
 
-    # Extract station name, everything between "Plan - " and " Issue"
+    # station name sits between "Plan - " and " Issue" in the filename
     station_match = re.search(r'Plan\s*-\s*(.+?)\s+Issue', name)
     if station_match:
         station = station_match.group(1).strip()

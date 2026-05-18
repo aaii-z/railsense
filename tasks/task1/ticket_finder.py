@@ -1,7 +1,8 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from itertools import product
+from zoneinfo import ZoneInfo
 import pandas as pd
 from rapidfuzz import process
 from zeep.helpers import serialize_object
@@ -30,7 +31,46 @@ def _load_station_lookup(
 STATION_LOOKUP = _load_station_lookup()
 MAX_STATIONS   = 3
 
-# Major cities map to many stations in the CSV, pin the most useful terminals first
+# RTJP gives "Any London Terminal" fares so all terminals show the same price.
+# Pick the actual terminal for this origin so the booking link works.
+_LONDON_TERMINALS = {"EUS", "VIC", "PAD", "KGX", "LST", "CHX", "WAT", "MYB", "STP"}
+_ORIGIN_TO_LONDON_TERMINAL: dict[str, str] = {
+    # Avanti West Coast → Euston
+    "LIV": "EUS", "LPY": "EUS",
+    "MAN": "EUS", "MCV": "EUS",
+    "BHM": "EUS",
+    "GLC": "EUS",                                    # Glasgow Central (Avanti)
+    # LNER → King's Cross (faster/more frequent than Avanti for these origins)
+    "EDB": "KGX",                                    # Edinburgh (LNER primary)
+    "GLQ": "KGX",                                    # Glasgow Queen Street via Edinburgh
+    "LDS": "KGX", "SHF": "KGX", "NCL": "KGX", "YRK": "KGX",
+    # Chiltern Railways → Marylebone
+    "BMO": "MYB",                                    # Birmingham Moor Street
+    "BSW": "MYB",                                    # Birmingham Snow Hill
+    # Greater Anglia → Liverpool Street
+    "NRW": "LST", "CBG": "LST", "IPS": "LST", "COL": "LST",
+    # GWR → Paddington
+    "BRI": "PAD", "BPW": "PAD", "OXF": "PAD",
+    "CDF": "PAD", "SWA": "PAD", "RDG": "PAD", "BTH": "PAD",
+    # South Western Railway → Waterloo
+    "SOU": "WAT", "BMH": "WAT", "PMS": "WAT", "PMH": "WAT", "SAL": "WAT",
+    # Southern / Gatwick Express → Victoria
+    "BTN": "VIC", "GTW": "VIC",
+    # East Midlands Railway → St Pancras
+    "NOT": "STP", "LEI": "STP", "DBY": "STP",
+}
+# Some CRS codes have no direct long-distance service. Remap to the main
+# terminal so the National Rail booking link finds a real train.
+_CANONICAL_FOR_BOOKING: dict[str, str] = {
+    "LPY": "LIV",  # Liverpool South Parkway → Liverpool Lime Street (Avanti)
+    "MCV": "MAN",  # Manchester Victoria → Manchester Piccadilly (Avanti)
+    "BMO": "BHM",  # Birmingham Moor Street → Birmingham New Street
+    "BSW": "BHM",  # Birmingham Snow Hill → Birmingham New Street
+    "BPW": "BRI",  # Bristol Parkway → Bristol Temple Meads (GWR)
+    "GLQ": "GLC",  # Glasgow Queen Street → Glasgow Central
+}
+
+# Big cities have many stations in the CSV. Pin the useful terminals first.
 _CITY_PRIORITY: dict[str, list[str]] = {
     "london":       ["LST", "VIC", "PAD", "KGX", "EUS", "CHX", "WAT"],
     "birmingham":   ["BHM", "BMO", "BSW"],
@@ -55,7 +95,12 @@ class StationAmbiguous(Exception):
 
 
 def resolve_station(user_input: str) -> list[str]:
-    """Fuzzy match user input to city or station name. Returns CRS codes."""
+    """Fuzzy match user input to a station/city. Returns CRS codes.
+
+    >= 90: accept
+    70-89: ambiguous, ask user to confirm
+    < 70:  give up
+    """
     query = user_input.strip().lower()
 
     if query in _CITY_PRIORITY:
@@ -64,24 +109,25 @@ def resolve_station(user_input: str) -> list[str]:
     if query in STATION_LOOKUP:
         return STATION_LOOKUP[query][:MAX_STATIONS]
 
-    matches = process.extract(query, STATION_LOOKUP.keys(), limit=2)
-    if not matches or matches[0][1] < 50:
+    matches = process.extract(query, STATION_LOOKUP.keys(), limit=3)
+    if not matches or matches[0][1] < 70:
         return []
 
     top_name, top_score, _ = matches[0]
 
-    if top_score >= 75:
-        if top_name in _CITY_PRIORITY:
-            return _CITY_PRIORITY[top_name][:MAX_STATIONS]
+    # Typos like 'londn' shouldn't trigger a confirmation prompt for big cities.
+    if top_name in _CITY_PRIORITY and top_score >= 80:
+        return _CITY_PRIORITY[top_name][:MAX_STATIONS]
+
+    if top_score >= 90:
         return STATION_LOOKUP[top_name][:1]
 
-    # Low confidence — if a second candidate is within 5 points, ask the user
-    if len(matches) >= 2 and matches[1][1] >= top_score - 5:
-        raise StationAmbiguous([matches[0][0].title(), matches[1][0].title()])
-
-    if top_name in _CITY_PRIORITY:
-        return _CITY_PRIORITY[top_name][:MAX_STATIONS]
-    return STATION_LOOKUP[top_name][:1]
+    # 70-89: ambiguous. Show top match plus anything within 10 points.
+    candidates = [matches[0][0].title()]
+    for name, score, _ in matches[1:]:
+        if score >= top_score - 10 and name.title() not in candidates:
+            candidates.append(name.title())
+    raise StationAmbiguous(candidates)
 
 
 
@@ -98,30 +144,36 @@ def default_ticket_state() -> dict[str, Any]:
 
 
 
+_UK_TZ = ZoneInfo("Europe/London")
+
+
 def _now_uk() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(_UK_TZ)
 
 
 def _now_str() -> str:
-    return _now_uk().strftime("%A %d %B %Y, %H:%M UTC")
+    return _now_uk().strftime("%A %d %B %Y, %H:%M %Z")
 
 
 
 def _extract_ticket_fields(user_input: str, state: dict[str, Any]) -> dict[str, Any]:
     prompt = (
         f"Current date and time: {_now_str()}\n\n"
-        "Extract ticket search fields from the user message.\n"
-        "origin and destination should be city or station names as the user said them.\n"
-        "departure_time and return_time must be ISO 8601 format (e.g. 2025-05-10T09:00:00). "
-        "Use the current date above to resolve relative times like 'tomorrow', 'in 2 hours', 'next Friday'.\n"
-        "If any of origin, destination, or departure_time is missing, "
-        "put one short follow-up question in next_question.\n\n"
+        "Extract ticket search fields from the user message and reply with a single JSON object.\n"
+        "Always copy origin and destination EXACTLY as the user wrote them, even if the word looks unusual or misspelled. Do NOT leave them null just because the name is unfamiliar.\n"
+        "departure_time and return_time must be ISO 8601 (e.g. 2026-05-10T09:00:00). "
+        "Use the current date above to resolve relative times like 'tomorrow', 'in 2 hours', 'next Friday'. "
+        "Treat 'morning' as 09:00, 'afternoon' as 14:00, 'evening' as 18:00 when no specific time is given.\n"
+        "If origin, destination, or departure_time is genuinely absent from the message AND not already in current state, "
+        "put one short follow-up question in next_question; otherwise next_question must be null.\n\n"
+        "Example input: \"I want to go from Norwich to London tomorrow morning\"\n"
+        "Example output: {\"origin\": \"Norwich\", \"destination\": \"London\", \"departure_time\": \"2026-05-18T09:00:00\", \"return_time\": null, \"next_question\": null}\n\n"
         f"Current state: {state}\n"
         f'User: "{user_input}"'
     )
     return chat_json(
         [
-            {"role": "system", "content": "You extract structured ticket booking fields from user messages."},
+            {"role": "system", "content": "You extract structured ticket booking fields from user messages. Reply with JSON only."},
             {"role": "user", "content": prompt},
         ],
         expected_keys=TICKET_KEYS,
@@ -141,24 +193,33 @@ def _is_complete(state: dict[str, Any]) -> bool:
 
 
 def _parse_time(time_str: str | None) -> tuple[datetime | None, bool]:
-    """Returns (datetime, assumed) - assumed=True if we fell back to tomorrow 9am."""
+    """Returns (datetime, assumed). assumed=True if we made up the time."""
     if not time_str:
         return None, False
     s = str(time_str).strip().replace("Z", "+00:00")
     try:
         dt = datetime.fromisoformat(s)
         if dt.hour == 0 and dt.minute == 0:
+            # midnight is almost certainly "no time given", default to 9am
             dt = dt.replace(hour=9)
-            return dt, True  # time was assumed
+            return dt, True
         return dt, False
     except ValueError:
+        # bad input, fall back to tomorrow 9am
         fallback = (_now_uk() + timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
         return fallback, True
 
 
 
 def _booking_link(origin: str, destination: str, depart_by: datetime, is_return: bool = False) -> str:
-    """Generate a National Rail journey planner deep link."""
+    """Build a National Rail journey planner URL.
+
+    Quirks found by testing:
+      - leavingDate must be DDMMYY (6 digits), not DDMMYYYY.
+      - leavingMin must be 00/15/30/45 or the page comes back empty.
+        Round down so the requested train still shows up.
+    """
+    rounded_min = (depart_by.minute // 15) * 15
     return (
         "https://www.nationalrail.co.uk/journey-planner/?"
         f"type={'return' if is_return else 'single'}"
@@ -167,13 +228,17 @@ def _booking_link(origin: str, destination: str, depart_by: datetime, is_return:
         f"&leavingType=departing"
         f"&leavingDate={depart_by.strftime('%d%m%y')}"
         f"&leavingHour={depart_by.strftime('%H')}"
-        f"&leavingMin={depart_by.strftime('%M')}"
-        f"&adults=1&children=0"
+        f"&leavingMin={rounded_min:02d}"
+        f"&adults=1&extraTime=0#O"
     )
 
 
 
 def _fetch_plan(origin: str, destination: str, depart_by: datetime, inward_time: datetime | None) -> dict:
+    """Call RTJP. Retries when OJP sends back HTML instead of SOAP (happens
+    sometimes, probably rate limit / load balancer). Retrying usually works.
+    """
+    import time as _time
     client = create_client()
     kwargs = {
         "origin":          {"stationCRS": origin},
@@ -190,7 +255,20 @@ def _fetch_plan(origin: str, destination: str, depart_by: datetime, inward_time:
     }
     if inward_time:
         kwargs["inwardTime"] = {"departBy": inward_time}
-    return serialize_object(client.service.RealtimeJourneyPlan(**kwargs))
+
+    last_exc = None
+    for attempt in range(3):
+        try:
+            return serialize_object(client.service.RealtimeJourneyPlan(**kwargs))
+        except Exception as exc:
+            msg = str(exc).lower()
+            # only retry the HTML-instead-of-SOAP case, not real SOAP errors
+            if "root element found is html" in msg or "does not contain a valid" in msg:
+                last_exc = exc
+                _time.sleep(0.8 * (attempt + 1))
+                continue
+            raise
+    raise last_exc if last_exc else RuntimeError("RTJP failed after retries")
 
 
 def _min_fare_pence(journey: dict) -> int | None:
@@ -242,7 +320,9 @@ def _format_journey(journey: dict, depart_by: datetime, is_return: bool) -> dict
     pence = _min_fare_pence(journey)
     origin      = _station_name(journey.get("origin"))
     destination = _station_name(journey.get("destination"))
-    # Use actual train departure time in booking link if available
+    # use main-terminal codes for the booking link
+    booking_origin = _CANONICAL_FOR_BOOKING.get(origin, origin)
+    booking_dest   = _CANONICAL_FOR_BOOKING.get(destination, destination)
     if dep is not None and hasattr(dep, "hour"):
         link_time = depart_by.replace(hour=dep.hour, minute=dep.minute, second=0, microsecond=0)
     else:
@@ -253,7 +333,7 @@ def _format_journey(journey: dict, depart_by: datetime, is_return: bool) -> dict
         "departure":   _format_time(dep),
         "arrival":     _format_time(arr),
         "price":       f"£{pence / 100:.2f}" if pence else "-",
-        "link":        _booking_link(origin, destination, link_time, is_return),
+        "link":        _booking_link(booking_origin, booking_dest, link_time, is_return),
         "pence":       pence or float("inf"),
         "dep_dt":      link_time,
     }
@@ -265,7 +345,7 @@ def _search_all_pairs(
     dest_codes: list[str],
     depart_by: datetime,
     inward_time: datetime | None,
-) -> list[dict]:
+) -> tuple[list[dict], list[str]]:
     """Search every origin×destination CRS pair, collect all journeys."""
     is_return    = inward_time is not None
     all_journeys = []
@@ -319,6 +399,19 @@ def handle_ticket_message(user_input: str, state: dict[str, Any], *, debug: bool
         if debug:
             resp["ticket_debug"] = {**dbg, "step": "station_ambiguous", "field": "destination", "candidates": e.candidates}
         return resp
+    # London destination: pick the terminal that actually serves this origin
+    # so the booking link points at a real train.
+    if dest_codes and all(c in _LONDON_TERMINALS for c in dest_codes):
+        primary_origin = origin_codes[0] if origin_codes else ""
+        london_terminal = _ORIGIN_TO_LONDON_TERMINAL.get(primary_origin, "EUS")
+        dest_codes = [london_terminal]
+
+    # Same thing the other way: London as origin, pick one terminal.
+    if origin_codes and all(c in _LONDON_TERMINALS for c in origin_codes):
+        primary_dest = dest_codes[0] if dest_codes else ""
+        london_terminal = _ORIGIN_TO_LONDON_TERMINAL.get(primary_dest, "EUS")
+        origin_codes = [london_terminal]
+
     dbg["origin_input"]   = state["origin"]
     dbg["origin_crs"]     = origin_codes
     dbg["dest_input"]     = state["destination"]
@@ -389,8 +482,21 @@ def handle_ticket_message(user_input: str, state: dict[str, Any], *, debug: bool
     pool = in_window if in_window else all_journeys
     top5 = sorted(pool, key=lambda j: j["pence"])[:5]
 
+    # Within each (origin, dest) group point every booking link at the cheapest
+    # journey's time. NR orders by departure time, so otherwise a later/pricier
+    # row would link to a page where the cheaper option is hidden below.
+    is_return = inward_time is not None
+    groups: dict[tuple[str, str], list[dict]] = {}
+    for j in top5:
+        groups.setdefault((j["origin"], j["destination"]), []).append(j)
+    for (orig, dest), group in groups.items():
+        cheapest = min(group, key=lambda j: j["pence"])
+        shared_link = _booking_link(orig, dest, cheapest["dep_dt"], is_return)
+        for j in group:
+            j["link"] = shared_link
+
     lines = [
-        f"{i}. {j['origin']} → {j['destination']} | dep {j['departure']} arr {j['arrival']} | from {j['price']} — [Book ticket]({j['link']})"
+        f"{i}. {j['origin']} → {j['destination']} | dep {j['departure']} arr {j['arrival']} | from {j['price']} - [Book ticket]({j['link']})"
         for i, j in enumerate(top5, 1)
     ]
 

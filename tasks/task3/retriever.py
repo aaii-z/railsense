@@ -12,7 +12,7 @@ def _get_embedder() -> SentenceTransformer:
     return _embedder
 
 
-def retrieve(query: str, top_k: int = 5, station: str = None) -> list[dict]:
+def retrieve(query: str, top_k: int = 5, station: str | None = None) -> list[dict]:
     embedding = _get_embedder().encode(query).tolist()
 
     conn = get_conn()

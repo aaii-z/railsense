@@ -30,12 +30,13 @@ def parse_time_to_minutes(t):
     try:
         h, m = str(t).strip().split(":")
         return int(h) * 60 + int(m)
-    except:
+    except (ValueError, AttributeError):
         return np.nan
 
 
 def fix_midnight_wraparound(delay):
-    """Fix delays caused by trains crossing midnight."""
+    """Trains that cross midnight come out with huge +/- minute differences,
+    add/subtract a day to undo that."""
     if pd.isna(delay):
         return delay
     if delay < -200:
@@ -54,7 +55,7 @@ def compute_delays(df: pd.DataFrame) -> pd.DataFrame:
     df["arrival_delay"]    = df["actual_arr_mins"] - df["planned_arr_mins"]
     df["departure_delay"]  = df["actual_dep_mins"] - df["planned_dep_mins"]
 
-    # Fix midnight wraparound first, then clip remaining outliers
+    # fix midnight wraparound first, then clip outliers
     df["arrival_delay"]   = df["arrival_delay"].apply(fix_midnight_wraparound).clip(-30, 120)
     df["departure_delay"] = df["departure_delay"].apply(fix_midnight_wraparound).clip(-30, 120)
     return df

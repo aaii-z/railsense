@@ -16,7 +16,7 @@ PLOT_DIR = str(_REPO_ROOT / "models" / "task2" / "plots")
 
 
 def train_with_tuning(X_train, y_train):
-    # Only tuning the two most impactful parameters
+    # only tuning these two, they made the biggest difference
     param_dist = {
         "n_estimators": [50, 100, 200],
         "max_depth":    [5, 10, 20, None],

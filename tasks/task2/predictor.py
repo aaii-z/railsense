@@ -6,12 +6,15 @@ from difflib import get_close_matches
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 import traceback
 
 import numpy as np
 
 from tasks.task2.preprocessing import ROUTE, parse_time_to_minutes
 from llm.client import chat_json
+
+_UK_TZ = ZoneInfo("Europe/London")
 
 
 TARGET_COLS = [
@@ -76,7 +79,7 @@ def _date_parts(journey_date: str | None) -> tuple[int, int]:
     if journey_date:
         dt = datetime.fromisoformat(journey_date)
     else:
-        dt = datetime.now()
+        dt = datetime.now(_UK_TZ)
     return dt.weekday(), dt.isocalendar().week
 
 
@@ -233,7 +236,7 @@ def handle_delay_message(
             "message": f"Delay field extraction failed: {exc}",
         }
         if debug:
-            response["debug"] = {
+            response["delay_debug"] = {
                 "error_stage": "delay_extraction",
                 "error_type": type(exc).__name__,
                 "error_message": str(exc),
@@ -252,7 +255,7 @@ def handle_delay_message(
             "message": question,
         }
         if debug:
-            response["debug"] = {"delay_extracted": extracted, **llm_debug}
+            response["delay_debug"] = {"delay_extracted": extracted, **llm_debug}
         return response
 
     try:
@@ -270,7 +273,7 @@ def handle_delay_message(
             "message": f"Delay prediction failed: {exc}",
         }
         if debug:
-            response["debug"] = {
+            response["delay_debug"] = {
                 "delay_extracted": extracted,
                 **llm_debug,
                 "error_stage": "delay_prediction",
