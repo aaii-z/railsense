@@ -1,133 +1,18 @@
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Any
 from itertools import product
 from zoneinfo import ZoneInfo
-import pandas as pd
-from rapidfuzz import process
 from zeep.helpers import serialize_object
 
 from rtjp.client import create_client
 from llm.client import chat_json
-
-
-def _load_station_lookup(
-    csv_path: str = str(Path(__file__).resolve().parents[2] / "data" / "station_cities.csv")
-) -> dict[str, list[str]]:
-    df = pd.read_csv(csv_path)
-    df.columns = df.columns.str.strip()
-    lookup: dict[str, list[str]] = {}
-    for _, row in df.iterrows():
-        city = str(row["city"]).strip().lower()
-        name = str(row["stationName"]).strip().lower()
-        crs  = str(row["crsCode"]).strip().upper()
-        for key in (city, name):
-            lookup.setdefault(key, [])
-            if crs not in lookup[key]:
-                lookup[key].append(crs)
-    return lookup
-
-
-STATION_LOOKUP = _load_station_lookup()
-MAX_STATIONS   = 3
-
-# RTJP gives "Any London Terminal" fares so all terminals show the same price.
-# Pick the actual terminal for this origin so the booking link works.
-_LONDON_TERMINALS = {"EUS", "VIC", "PAD", "KGX", "LST", "CHX", "WAT", "MYB", "STP"}
-_ORIGIN_TO_LONDON_TERMINAL: dict[str, str] = {
-    # Avanti West Coast → Euston
-    "LIV": "EUS", "LPY": "EUS",
-    "MAN": "EUS", "MCV": "EUS",
-    "BHM": "EUS",
-    "GLC": "EUS",                                    # Glasgow Central (Avanti)
-    # LNER → King's Cross (faster/more frequent than Avanti for these origins)
-    "EDB": "KGX",                                    # Edinburgh (LNER primary)
-    "GLQ": "KGX",                                    # Glasgow Queen Street via Edinburgh
-    "LDS": "KGX", "SHF": "KGX", "NCL": "KGX", "YRK": "KGX",
-    # Chiltern Railways → Marylebone
-    "BMO": "MYB",                                    # Birmingham Moor Street
-    "BSW": "MYB",                                    # Birmingham Snow Hill
-    # Greater Anglia → Liverpool Street
-    "NRW": "LST", "CBG": "LST", "IPS": "LST", "COL": "LST",
-    # GWR → Paddington
-    "BRI": "PAD", "BPW": "PAD", "OXF": "PAD",
-    "CDF": "PAD", "SWA": "PAD", "RDG": "PAD", "BTH": "PAD",
-    # South Western Railway → Waterloo
-    "SOU": "WAT", "BMH": "WAT", "PMS": "WAT", "PMH": "WAT", "SAL": "WAT",
-    # Southern / Gatwick Express → Victoria
-    "BTN": "VIC", "GTW": "VIC",
-    # East Midlands Railway → St Pancras
-    "NOT": "STP", "LEI": "STP", "DBY": "STP",
-}
-# Some CRS codes have no direct long-distance service. Remap to the main
-# terminal so the National Rail booking link finds a real train.
-_CANONICAL_FOR_BOOKING: dict[str, str] = {
-    "LPY": "LIV",  # Liverpool South Parkway → Liverpool Lime Street (Avanti)
-    "MCV": "MAN",  # Manchester Victoria → Manchester Piccadilly (Avanti)
-    "BMO": "BHM",  # Birmingham Moor Street → Birmingham New Street
-    "BSW": "BHM",  # Birmingham Snow Hill → Birmingham New Street
-    "BPW": "BRI",  # Bristol Parkway → Bristol Temple Meads (GWR)
-    "GLQ": "GLC",  # Glasgow Queen Street → Glasgow Central
-}
-
-# Big cities have many stations in the CSV. Pin the useful terminals first.
-_CITY_PRIORITY: dict[str, list[str]] = {
-    "london":       ["LST", "VIC", "PAD", "KGX", "EUS", "CHX", "WAT"],
-    "birmingham":   ["BHM", "BMO", "BSW"],
-    "manchester":   ["MAN", "MCV"],
-    "edinburgh":    ["EDB"],
-    "glasgow":      ["GLC", "GLQ"],
-    "bristol":      ["BRI", "BPW"],
-    "leeds":        ["LDS"],
-    "sheffield":    ["SHF"],
-    "liverpool":    ["LIV", "LPY"],
-    "newcastle":    ["NCL"],
-    "norwich":      ["NRW"],
-    "cambridge":    ["CBG"],
-    "oxford":       ["OXF"],
-    "york":         ["YRK"],
-}
-
-
-class StationAmbiguous(Exception):
-    def __init__(self, candidates: list[str]):
-        self.candidates = candidates
-
-
-def resolve_station(user_input: str) -> list[str]:
-    """Fuzzy match user input to a station/city. Returns CRS codes.
-
-    >= 90: accept
-    70-89: ambiguous, ask user to confirm
-    < 70:  give up
-    """
-    query = user_input.strip().lower()
-
-    if query in _CITY_PRIORITY:
-        return _CITY_PRIORITY[query][:MAX_STATIONS]
-
-    if query in STATION_LOOKUP:
-        return STATION_LOOKUP[query][:MAX_STATIONS]
-
-    matches = process.extract(query, STATION_LOOKUP.keys(), limit=3)
-    if not matches or matches[0][1] < 70:
-        return []
-
-    top_name, top_score, _ = matches[0]
-
-    # Typos like 'londn' shouldn't trigger a confirmation prompt for big cities.
-    if top_name in _CITY_PRIORITY and top_score >= 80:
-        return _CITY_PRIORITY[top_name][:MAX_STATIONS]
-
-    if top_score >= 90:
-        return STATION_LOOKUP[top_name][:1]
-
-    # 70-89: ambiguous. Show top match plus anything within 10 points.
-    candidates = [matches[0][0].title()]
-    for name, score, _ in matches[1:]:
-        if score >= top_score - 10 and name.title() not in candidates:
-            candidates.append(name.title())
-    raise StationAmbiguous(candidates)
+from tasks.task1.stations import (
+    StationAmbiguous,
+    CANONICAL_FOR_BOOKING,
+    resolve_station,
+    london_terminal_for,
+    is_london,
+)
 
 
 
@@ -152,7 +37,15 @@ def _now_uk() -> datetime:
 
 
 def _now_str() -> str:
-    return _now_uk().strftime("%A %d %B %Y, %H:%M %Z")
+    now = _now_uk()
+    upcoming = ", ".join(
+        (now + timedelta(days=i)).strftime("%a %d %b")
+        for i in range(1, 15)
+    )
+    return (
+        f"Today is {now.strftime('%A %d %B %Y')}, current time {now.strftime('%H:%M %Z')}. "
+        f"Upcoming dates: {upcoming}."
+    )
 
 
 
@@ -199,6 +92,8 @@ def _parse_time(time_str: str | None) -> tuple[datetime | None, bool]:
     s = str(time_str).strip().replace("Z", "+00:00")
     try:
         dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=_UK_TZ)
         if dt.hour == 0 and dt.minute == 0:
             # midnight is almost certainly "no time given", default to 9am
             dt = dt.replace(hour=9)
@@ -321,8 +216,8 @@ def _format_journey(journey: dict, depart_by: datetime, is_return: bool) -> dict
     origin      = _station_name(journey.get("origin"))
     destination = _station_name(journey.get("destination"))
     # use main-terminal codes for the booking link
-    booking_origin = _CANONICAL_FOR_BOOKING.get(origin, origin)
-    booking_dest   = _CANONICAL_FOR_BOOKING.get(destination, destination)
+    booking_origin = CANONICAL_FOR_BOOKING.get(origin, origin)
+    booking_dest   = CANONICAL_FOR_BOOKING.get(destination, destination)
     if dep is not None and hasattr(dep, "hour"):
         link_time = depart_by.replace(hour=dep.hour, minute=dep.minute, second=0, microsecond=0)
     else:
@@ -362,31 +257,34 @@ def _search_all_pairs(
 
 
 
-def handle_ticket_message(user_input: str, state: dict[str, Any], *, debug: bool = False) -> dict[str, Any]:
-    dbg: dict[str, Any] = {}
-
-    # Step 1 - extract fields
+def _collect_slots(user_input: str, state: dict[str, Any], debug: bool) -> dict[str, Any] | None:
+    """Extract fields from the user message. Returns a follow-up response if slots are still
+    missing, or None when all required slots are filled and search can proceed."""
     extracted = _extract_ticket_fields(user_input, state)
     _update_state(state, extracted)
+    if _is_complete(state):
+        return None
+    question = extracted.get("next_question") or "Please tell me your origin, destination, and departure time."
+    resp: dict[str, Any] = {"kind": "ticket_search", "done": False, "message": question}
+    if debug:
+        resp["ticket_debug"] = {"step": "collecting_fields", "state": dict(state)}
+    return resp
 
-    # Step 2 - ask follow-up if slots missing
-    if not _is_complete(state):
-        question = extracted.get("next_question") or "Please tell me your origin, destination, and departure time."
-        resp = {"kind": "ticket_search", "done": False, "message": question}
-        if debug:
-            resp["ticket_debug"] = {"step": "collecting_fields", "state": dict(state)}
-        return resp
 
-    # Step 3 - resolve city names to CRS codes
+def _run_search(state: dict[str, Any], debug: bool) -> dict[str, Any]:
+    """Resolve stations, call RTJP, and return formatted results. Assumes all slots are filled."""
+    dbg: dict[str, Any] = {}
+
+    # Resolve origin/destination names to CRS codes
     try:
         origin_codes = resolve_station(str(state["origin"]))
     except StationAmbiguous as e:
         state["origin"] = None
         opts = " or ".join(e.candidates)
-        resp = {"kind": "ticket_search", "done": False,
+        resp: dict[str, Any] = {"kind": "ticket_search", "done": False,
                 "message": f"Did you mean {opts}? Please clarify your departure station."}
         if debug:
-            resp["ticket_debug"] = {**dbg, "step": "station_ambiguous", "field": "origin", "candidates": e.candidates}
+            resp["ticket_debug"] = {"step": "station_ambiguous", "field": "origin", "candidates": e.candidates}
         return resp
 
     try:
@@ -397,27 +295,23 @@ def handle_ticket_message(user_input: str, state: dict[str, Any], *, debug: bool
         resp = {"kind": "ticket_search", "done": False,
                 "message": f"Did you mean {opts}? Please clarify your destination station."}
         if debug:
-            resp["ticket_debug"] = {**dbg, "step": "station_ambiguous", "field": "destination", "candidates": e.candidates}
+            resp["ticket_debug"] = {"step": "station_ambiguous", "field": "destination", "candidates": e.candidates}
         return resp
-    # London destination: pick the terminal that actually serves this origin
-    # so the booking link points at a real train.
-    if dest_codes and all(c in _LONDON_TERMINALS for c in dest_codes):
-        primary_origin = origin_codes[0] if origin_codes else ""
-        london_terminal = _ORIGIN_TO_LONDON_TERMINAL.get(primary_origin, "EUS")
-        dest_codes = [london_terminal]
 
-    # Same thing the other way: London as origin, pick one terminal.
-    if origin_codes and all(c in _LONDON_TERMINALS for c in origin_codes):
-        primary_dest = dest_codes[0] if dest_codes else ""
-        london_terminal = _ORIGIN_TO_LONDON_TERMINAL.get(primary_dest, "EUS")
-        origin_codes = [london_terminal]
+    # London terminal disambiguation: pin to the one terminal that serves this route
+    if is_london(dest_codes):
+        dest_codes = [london_terminal_for(origin_codes[0] if origin_codes else "")]
+    if is_london(origin_codes):
+        origin_codes = [london_terminal_for(dest_codes[0] if dest_codes else "")]
 
-    dbg["origin_input"]   = state["origin"]
-    dbg["origin_crs"]     = origin_codes
-    dbg["dest_input"]     = state["destination"]
-    dbg["dest_crs"]       = dest_codes
-    dbg["departure_time"] = str(state["departure_time"])
-    dbg["return_time"]    = str(state.get("return_time"))
+    dbg.update({
+        "origin_input":   state["origin"],
+        "origin_crs":     origin_codes,
+        "dest_input":     state["destination"],
+        "dest_crs":       dest_codes,
+        "departure_time": str(state["departure_time"]),
+        "return_time":    str(state.get("return_time")),
+    })
 
     if not origin_codes:
         bad = state["origin"]
@@ -437,7 +331,7 @@ def handle_ticket_message(user_input: str, state: dict[str, Any], *, debug: bool
             resp["ticket_debug"] = {**dbg, "step": "crs_lookup_failed", "failed_for": "destination"}
         return resp
 
-    # Step 4 - parse times
+    # Parse times
     depart_by, assumed = _parse_time(str(state["departure_time"]))
     if depart_by is None:
         state["departure_time"] = None
@@ -446,12 +340,20 @@ def handle_ticket_message(user_input: str, state: dict[str, Any], *, debug: bool
             resp["ticket_debug"] = {**dbg, "step": "time_parse_failed"}
         return resp
 
+    if depart_by < _now_uk():
+        state["departure_time"] = None
+        resp = {"kind": "ticket_search", "done": False,
+                "message": f"The departure time I understood ({depart_by.strftime('%A %d %B at %H:%M')}) is in the past. When would you like to travel?"}
+        if debug:
+            resp["ticket_debug"] = {**dbg, "step": "departure_in_past", "parsed_as": depart_by.isoformat()}
+        return resp
+
     inward_time, _ = _parse_time(state.get("return_time"))
-    dbg["depart_by"]    = depart_by.isoformat()
-    dbg["inward_time"]  = inward_time.isoformat() if inward_time else None
+    dbg["depart_by"]      = depart_by.isoformat()
+    dbg["inward_time"]    = inward_time.isoformat() if inward_time else None
     dbg["pairs_searched"] = [f"{o}→{d}" for o in origin_codes for d in dest_codes]
 
-    # Step 5 - search all station pair combinations
+    # Call RTJP for every origin×destination pair
     all_journeys, search_errors = _search_all_pairs(origin_codes, dest_codes, depart_by, inward_time)
     dbg["journeys_found"] = len(all_journeys)
     if search_errors:
@@ -473,25 +375,18 @@ def handle_ticket_message(user_input: str, state: dict[str, Any], *, debug: bool
             resp["ticket_debug"] = dbg
         return resp
 
-    # Step 6 - prefer journeys within ±3 h of requested departure, then sort by price
+    # Filter to ±3 h window, sort by price, take top 5
     window = timedelta(hours=3)
-    in_window = [
-        j for j in all_journeys
-        if abs((j["dep_dt"] - depart_by).total_seconds()) <= window.total_seconds()
-    ]
-    pool = in_window if in_window else all_journeys
-    top5 = sorted(pool, key=lambda j: j["pence"])[:5]
+    in_window = [j for j in all_journeys if abs((j["dep_dt"] - depart_by).total_seconds()) <= window.total_seconds()]
+    top5 = sorted(in_window or all_journeys, key=lambda j: j["pence"])[:5]
 
-    # Within each (origin, dest) group point every booking link at the cheapest
-    # journey's time. NR orders by departure time, so otherwise a later/pricier
-    # row would link to a page where the cheaper option is hidden below.
+    # Point all booking links in each group at the cheapest journey's departure time
     is_return = inward_time is not None
     groups: dict[tuple[str, str], list[dict]] = {}
     for j in top5:
         groups.setdefault((j["origin"], j["destination"]), []).append(j)
     for (orig, dest), group in groups.items():
-        cheapest = min(group, key=lambda j: j["pence"])
-        shared_link = _booking_link(orig, dest, cheapest["dep_dt"], is_return)
+        shared_link = _booking_link(orig, dest, min(group, key=lambda j: j["pence"])["dep_dt"], is_return)
         for j in group:
             j["link"] = shared_link
 
@@ -499,20 +394,25 @@ def handle_ticket_message(user_input: str, state: dict[str, Any], *, debug: bool
         f"{i}. {j['origin']} → {j['destination']} | dep {j['departure']} arr {j['arrival']} | from {j['price']} - [Book ticket]({j['link']})"
         for i, j in enumerate(top5, 1)
     ]
-
     note   = "Note: departure time was assumed.\n" if assumed else ""
     plural = f"Searched {len(origin_codes)}×{len(dest_codes)} station combinations.\n" if len(origin_codes) + len(dest_codes) > 2 else ""
-    prefix = note + plural
 
     state.update(default_ticket_state())
 
     resp = {
         "kind":     "ticket_search",
         "done":     True,
-        "message":  prefix + "\n".join(lines),
+        "message":  note + plural + "\n".join(lines),
         "journeys": [{k: v for k, v in j.items() if k not in ("pence", "dep_dt")} for j in top5],
     }
     if debug:
         dbg["step"] = "success"
         resp["ticket_debug"] = dbg
     return resp
+
+
+def handle_ticket_message(user_input: str, state: dict[str, Any], *, debug: bool = False) -> dict[str, Any]:
+    early = _collect_slots(user_input, state, debug)
+    if early is not None:
+        return early
+    return _run_search(state, debug)
