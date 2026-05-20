@@ -15,6 +15,8 @@ sentence-transformers
 scikit-learn
 pandas
 numpy
+lightgbm
+xgboost
 
 # Document parsing - Task 3 KB
 python-pptx

@@ -1,8 +1,15 @@
+import sys
 import pickle
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
+
+# make project root importable when running this file directly
+_ROOT = Path(__file__).resolve().parents[2]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import GroupShuffleSplit, RandomizedSearchCV
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
@@ -16,14 +23,18 @@ PLOT_DIR = str(_REPO_ROOT / "models" / "task2" / "plots")
 
 
 def train_with_tuning(X_train, y_train):
-    # only tuning these two, they made the biggest difference
+    # Step 1: tune on a 20% sample — Random Forest is slow on millions of rows
+    rng = np.random.default_rng(42)
+    sample_idx = rng.choice(len(X_train), size=int(len(X_train) * 0.2), replace=False)
+    X_sample, y_sample = X_train[sample_idx], y_train[sample_idx]
+    print(f"  Tuning on {len(X_sample):,} rows (20% sample) ...")
+
     param_dist = {
         "n_estimators": [50, 100, 200],
         "max_depth":    [5, 10, 20, None],
     }
-    rf = RandomForestRegressor(random_state=42, n_jobs=-1)
     search = RandomizedSearchCV(
-        rf,
+        RandomForestRegressor(random_state=42, n_jobs=-1),
         param_distributions=param_dist,
         n_iter=6,
         cv=3,
@@ -32,9 +43,18 @@ def train_with_tuning(X_train, y_train):
         n_jobs=-1,
         verbose=1,
     )
-    search.fit(X_train, y_train)
+    search.fit(X_sample, y_sample)
     print(f"\n  Best params: {search.best_params_}")
-    return search.best_estimator_
+
+    # Step 2: retrain with best params on the FULL training data
+    print(f"  Retraining on full {len(X_train):,} rows ...")
+    best = RandomForestRegressor(
+        **search.best_params_,
+        random_state=42,
+        n_jobs=-1,
+    )
+    best.fit(X_train, y_train)
+    return best
 
 
 def evaluate(model, X_test, y_test, plot_dir):

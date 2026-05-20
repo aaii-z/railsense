@@ -11,7 +11,7 @@ import traceback
 
 import numpy as np
 
-from tasks.task2.preprocessing import ROUTE, parse_time_to_minutes
+from tasks.task2.preprocessing import ROUTE, ROUTE_WEY2WAT, ROUTE_WAT2WEY, parse_time_to_minutes
 from llm.client import chat_json
 
 _UK_TZ = ZoneInfo("Europe/London")
@@ -152,12 +152,25 @@ def _choose_preferred_code(codes: list[str]) -> str:
     return sorted(codes, key=lambda code: route_order.get(code, 999))[0]
 
 
+def _stops_remaining(station_code: str, destination_code: str) -> int:
+    """Number of route stops between current station and destination."""
+    for route in (ROUTE_WEY2WAT, ROUTE_WAT2WEY):
+        if station_code in route and destination_code in route:
+            si = route.index(station_code)
+            di = route.index(destination_code)
+            if di > si:
+                return di - si
+    return 0
+
+
 def predict_delay_minutes(
     *,
     station: str,
     destination: str,
     current_delay_minutes: float,
     planned_arrival_time: str,
+    departure_delay_minutes: float = 0.0,
+    has_delay_reason: int = 0,
     journey_date: str | None = None,
 ) -> float:
     model, encoder = _load_assets()
@@ -169,15 +182,20 @@ def predict_delay_minutes(
         raise ValueError("planned_arrival_time must be in HH:MM format.")
 
     day_of_week, week_of_year = _date_parts(journey_date)
+    stops = _stops_remaining(station_code, destination_code)
+
     features = np.array(
         [[
             float(encoder.transform([station_code])[0]),
             float(encoder.transform([destination_code])[0]),
             float(current_delay_minutes),
+            float(departure_delay_minutes),
             float(planned_arr_mins),
             float(day_of_week),
             float(week_of_year),
             float(_peak_hour(int(planned_arr_mins))),
+            float(stops),
+            float(has_delay_reason),
         ]]
     )
     return float(model.predict(features)[0])
