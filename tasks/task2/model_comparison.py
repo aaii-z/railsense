@@ -14,6 +14,7 @@ from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.linear_model import Ridge
 from sklearn.model_selection import GroupShuffleSplit, RandomizedSearchCV, GroupKFold
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 import xgboost as xgb
@@ -247,6 +248,9 @@ if __name__ == "__main__":
     X, y, encoder, df = run_preprocessing(DATA_DIR, SAVE_DIR)
     groups = df["journey_id"].values
     print(f"  {len(df):,} rows | {df['journey_id'].nunique():,} journeys")
+
+    imputer = SimpleImputer(strategy="median")
+    X = imputer.fit_transform(X)
 
     print("\n--- Train/Test Split ---")
     gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=14)

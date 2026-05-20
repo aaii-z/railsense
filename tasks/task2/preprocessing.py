@@ -204,7 +204,7 @@ def build_features_for_chunk(df: pd.DataFrame, station_delays: pd.DataFrame, dir
     # Only keep pairs where destination is further along the route
     merged = merged[merged["position_dest"] > merged["position"]]
     merged["stops_remaining"] = merged["position_dest"] - merged["position"]
-    return merged.dropna(subset=["arrival_delay", TARGET_COL])
+    return merged.dropna(subset=FEATURE_COLS + [TARGET_COL])
 
 
 def encode_stations(df: pd.DataFrame, encoder=None, fit: bool = True):
