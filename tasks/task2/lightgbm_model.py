@@ -35,11 +35,11 @@ def train_with_tuning(X_train, y_train, X_val, y_val):
         "learning_rate":     [0.01, 0.05, 0.1],
     }
     base = lgb.LGBMRegressor(
-        n_estimators=2000,
+        n_estimators=300,       # enough to rank params; early stopping handles depth in final fit
         subsample=0.8,
         colsample_bytree=0.8,
-        random_state=42,
-        n_jobs=-1,
+        random_state=14,
+        n_jobs=1,               # let RandomizedSearchCV parallelize across folds instead
         verbose=-1,
     )
     search = RandomizedSearchCV(
@@ -48,7 +48,7 @@ def train_with_tuning(X_train, y_train, X_val, y_val):
         n_iter=9,
         cv=3,
         scoring="neg_mean_absolute_error",
-        random_state=42,
+        random_state=14,
         n_jobs=-1,
         verbose=1,
     )
@@ -62,7 +62,7 @@ def train_with_tuning(X_train, y_train, X_val, y_val):
         n_estimators=2000,
         subsample=0.8,
         colsample_bytree=0.8,
-        random_state=42,
+        random_state=14,
         n_jobs=-1,
         verbose=-1,
     )
@@ -155,7 +155,7 @@ if __name__ == "__main__":
     X, y, encoder, df = run_preprocessing(DATA_DIR, SAVE_DIR)
 
     print("\n--- Splitting by journey ---")
-    gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
+    gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=14)
     train_idx, test_idx = next(gss.split(X, y, groups=df["journey_id"]))
 
     X_train, X_test = X[train_idx], X[test_idx]

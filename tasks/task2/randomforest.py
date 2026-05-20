@@ -34,12 +34,12 @@ def train_with_tuning(X_train, y_train):
         "max_depth":    [5, 10, 20, None],
     }
     search = RandomizedSearchCV(
-        RandomForestRegressor(random_state=42, n_jobs=-1),
+        RandomForestRegressor(random_state=14, n_jobs=1),  # let RandomizedSearchCV parallelize across folds
         param_distributions=param_dist,
         n_iter=6,
         cv=3,
         scoring="neg_mean_absolute_error",
-        random_state=42,
+        random_state=14,
         n_jobs=-1,
         verbose=1,
     )
@@ -50,7 +50,7 @@ def train_with_tuning(X_train, y_train):
     print(f"  Retraining on full {len(X_train):,} rows ...")
     best = RandomForestRegressor(
         **search.best_params_,
-        random_state=42,
+        random_state=14,
         n_jobs=-1,
     )
     best.fit(X_train, y_train)
@@ -134,7 +134,7 @@ if __name__ == "__main__":
     X, y, encoder, df = run_preprocessing(DATA_DIR, SAVE_DIR)
 
     print("\n--- Splitting by journey ---")
-    gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
+    gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=14)
     train_idx, test_idx = next(gss.split(X, y, groups=df["journey_id"]))
 
     X_train, X_test = X[train_idx], X[test_idx]
