@@ -296,13 +296,11 @@ if __name__ == "__main__":
     print("\n--- Hyperparameter Tuning (RandomizedSearchCV) ---")
     search_configs = {
         "Ridge": {
-            "estimator": Pipeline([("scaler", StandardScaler()), ("model", Ridge())]),
+            "estimator": Pipeline([("scaler", StandardScaler()), ("model", Ridge(solver="lsqr"))]),
             "param_dist": {
-                "model__alpha":  [0.01, 1.0, 100.0],
-                "model__solver": ["auto", "svd", "lsqr"],
-                "model__tol":    [1e-4, 1e-3, 1e-2],
+                "model__alpha":  [0.001, 0.01, 0.1, 1.0, 10.0, 100.0],
             },
-            "n_iter": 9,
+            "n_iter": 6,
         },
         "Random Forest": {
             "estimator": RandomForestRegressor(random_state=14, n_jobs=1),
