@@ -72,14 +72,26 @@ def _load_station_lookup(
     df = pd.read_csv(csv_path)
     df.columns = df.columns.str.strip()
     lookup: dict[str, list[str]] = {}
+
+    # Pass 1 — station names: exact name matches must come first so that
+    # "luton" → LUT (Luton) before LTN (Luton Airport Parkway) even though
+    # Luton Airport Parkway's city is also "Luton".
     for _, row in df.iterrows():
-        city = str(row["city"]).strip().lower()
         name = str(row["stationName"]).strip().lower()
         crs  = str(row["crsCode"]).strip().upper()
-        for key in (city, name):
-            lookup.setdefault(key, [])
-            if crs not in lookup[key]:
-                lookup[key].append(crs)
+        lookup.setdefault(name, [])
+        if crs not in lookup[name]:
+            lookup[name].append(crs)
+
+    # Pass 2 — cities: append only if not already present (satellite stations
+    # share a city with the main terminus but shouldn't displace it).
+    for _, row in df.iterrows():
+        city = str(row["city"]).strip().lower()
+        crs  = str(row["crsCode"]).strip().upper()
+        lookup.setdefault(city, [])
+        if crs not in lookup[city]:
+            lookup[city].append(crs)
+
     return lookup
 
 
@@ -107,6 +119,9 @@ def resolve_station(user_input: str) -> list[str]:
         return STATION_LOOKUP[query][:MAX_STATIONS]
 
     matches = process.extract(query, STATION_LOOKUP.keys(), limit=3)
+    # Drop matches where the query is more than 2x longer than the station name —
+    # these are substring-inflation false positives (e.g. "zzzznotastation" → "aston").
+    matches = [(n, s, i) for n, s, i in matches if len(query) <= len(n) * 2]
     if not matches or matches[0][1] < 70:
         return []
 
@@ -116,7 +131,9 @@ def resolve_station(user_input: str) -> list[str]:
     if top_name in _CITY_PRIORITY and top_score >= 80:
         return _CITY_PRIORITY[top_name][:MAX_STATIONS]
 
-    if top_score >= 90:
+    # Only auto-accept if the query is at least 60% as long as the matched name.
+    # Prevents short prefixes like "sout" from being accepted as "ardrossan south beach".
+    if top_score >= 90 and len(query) >= len(top_name) * 0.6:
         return STATION_LOOKUP[top_name][:1]
 
     # 70-89: ambiguous — show top match plus anything within 10 points.

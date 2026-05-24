@@ -99,6 +99,12 @@ def get_session_messages(session_id: str) -> list[dict]:
 
 
 def ensure_table() -> None:
+    """Check that the conversations table exists (created by migrations).
+
+    Falls back to CREATE TABLE IF NOT EXISTS so the app still boots
+    if migrations haven't been run yet, but the canonical path is:
+        python -m db.migrate
+    """
     conn = get_conn()
     try:
         cur = conn.cursor()
@@ -113,10 +119,6 @@ def ensure_table() -> None:
                     extras     JSONB,
                     created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
                 )
-            """)
-            cur.execute("""
-                ALTER TABLE conversations
-                ADD COLUMN IF NOT EXISTS extras JSONB
             """)
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS conversations_session_idx

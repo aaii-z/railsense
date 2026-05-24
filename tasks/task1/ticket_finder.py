@@ -57,10 +57,17 @@ def _extract_ticket_fields(user_input: str, state: dict[str, Any]) -> dict[str, 
         "departure_time and return_time must be ISO 8601 (e.g. 2026-05-10T09:00:00). "
         "Use the current date above to resolve relative times like 'tomorrow', 'in 2 hours', 'next Friday'. "
         "Treat 'morning' as 09:00, 'afternoon' as 14:00, 'evening' as 18:00 when no specific time is given.\n"
+        "FOLLOW-UP RULES (current state may already have values from a previous search):\n"
+        "- If origin and/or destination are already in current state and the user does NOT mention new ones, keep them as-is (output null so _update_state leaves them untouched).\n"
+        "- If the user says 'return', 'come back', 'going back', 'on the way back', or similar WITHOUT giving a new origin/destination, they want to add a return leg to the SAME journey — set return_time only, leave origin/destination null.\n"
+        "- If the user gives a completely new origin or destination, override that field.\n"
         "If origin, destination, or departure_time is genuinely absent from the message AND not already in current state, "
         "put one short follow-up question in next_question; otherwise next_question must be null.\n\n"
-        "Example input: \"I want to go from Norwich to London tomorrow morning\"\n"
-        "Example output: {\"origin\": \"Norwich\", \"destination\": \"London\", \"departure_time\": \"2026-05-18T09:00:00\", \"return_time\": null, \"next_question\": null}\n\n"
+        "Example follow-up: state has origin=Liverpool, destination=Southampton, departure_time=2026-05-25T18:00:00\n"
+        "User: \"also want a return after tomorrow night\"\n"
+        "Output: {\"origin\": null, \"destination\": null, \"departure_time\": null, \"return_time\": \"2026-05-25T23:00:00\", \"next_question\": null}\n\n"
+        "Example new search: \"I want to go from Norwich to London tomorrow morning\"\n"
+        "Output: {\"origin\": \"Norwich\", \"destination\": \"London\", \"departure_time\": \"2026-05-18T09:00:00\", \"return_time\": null, \"next_question\": null}\n\n"
         f"Current state: {state}\n"
         f'User: "{user_input}"'
     )
@@ -106,8 +113,11 @@ def _parse_time(time_str: str | None) -> tuple[datetime | None, bool]:
 
 
 
-def _booking_link(origin: str, destination: str, depart_by: datetime, is_return: bool = False) -> str:
-    """Build a National Rail journey planner URL.
+def _booking_link(origin: str, destination: str, depart_by: datetime) -> str:
+    """Build a National Rail journey planner URL for a single ticket.
+
+    Always uses type=single — two singles are compared/shown separately rather
+    than bundled into one return, which is typically cheaper.
 
     Quirks found by testing:
       - leavingDate must be DDMMYY (6 digits), not DDMMYYYY.
@@ -117,7 +127,7 @@ def _booking_link(origin: str, destination: str, depart_by: datetime, is_return:
     rounded_min = (depart_by.minute // 15) * 15
     return (
         "https://www.nationalrail.co.uk/journey-planner/?"
-        f"type={'return' if is_return else 'single'}"
+        f"type=single"
         f"&origin={origin}"
         f"&destination={destination}"
         f"&leavingType=departing"
@@ -199,14 +209,14 @@ def _station_name(value) -> str:
     return "?"
 
 
-def _extract_journeys(plan: dict) -> list[dict]:
-    raw = plan.get("outwardJourney") or []
+def _extract_journeys(plan: dict, key: str = "outwardJourney") -> list[dict]:
+    raw = plan.get(key) or []
     if isinstance(raw, dict):
         raw = [raw]
     return [j for j in raw if isinstance(j, dict)]
 
 
-def _format_journey(journey: dict, depart_by: datetime, is_return: bool) -> dict:
+def _format_journey(journey: dict, depart_by: datetime) -> dict:
     tt    = journey.get("timetable") or {}
     sched = tt.get("scheduled") or {}
     rt    = tt.get("realtime") or {}
@@ -228,11 +238,26 @@ def _format_journey(journey: dict, depart_by: datetime, is_return: bool) -> dict
         "departure":   _format_time(dep),
         "arrival":     _format_time(arr),
         "price":       f"£{pence / 100:.2f}" if pence else "-",
-        "link":        _booking_link(booking_origin, booking_dest, link_time, is_return),
+        "link":        _booking_link(booking_origin, booking_dest, link_time),
         "pence":       pence or float("inf"),
         "dep_dt":      link_time,
     }
 
+
+
+def _pick_top5(journeys: list[dict], depart_by: datetime) -> list[dict]:
+    """Filter to ±3 h window, sort by price, take top 5, assign shared booking links."""
+    window = timedelta(hours=3)
+    in_window = [j for j in journeys if abs((j["dep_dt"] - depart_by).total_seconds()) <= window.total_seconds()]
+    top5 = sorted(in_window or journeys, key=lambda j: j["pence"])[:5]
+    groups: dict[tuple[str, str], list[dict]] = {}
+    for j in top5:
+        groups.setdefault((j["origin"], j["destination"]), []).append(j)
+    for (orig, dest), group in groups.items():
+        shared_link = _booking_link(orig, dest, min(group, key=lambda j: j["pence"])["dep_dt"])
+        for j in group:
+            j["link"] = shared_link
+    return top5
 
 
 def _search_all_pairs(
@@ -240,32 +265,61 @@ def _search_all_pairs(
     dest_codes: list[str],
     depart_by: datetime,
     inward_time: datetime | None,
-) -> tuple[list[dict], list[str]]:
-    """Search every origin×destination CRS pair, collect all journeys."""
-    is_return    = inward_time is not None
-    all_journeys = []
+) -> tuple[list[dict], list[dict], list[str]]:
+    """Search every origin×destination CRS pair, collect outward and (if return) inward journeys."""
+    is_return   = inward_time is not None
+    all_outward = []
+    all_inward  = []
     errors = []
     for origin, destination in product(origin_codes, dest_codes):
         try:
-            plan      = _fetch_plan(origin, destination, depart_by, inward_time)
-            journeys  = _extract_journeys(plan)
-            formatted = [_format_journey(j, depart_by, is_return) for j in journeys]
-            all_journeys.extend(formatted)
+            plan = _fetch_plan(origin, destination, depart_by, inward_time)
+            out  = _extract_journeys(plan, "outwardJourney")
+            all_outward.extend(_format_journey(j, depart_by) for j in out)
+            if is_return:
+                inn = _extract_journeys(plan, "inwardJourney")
+                all_inward.extend(_format_journey(j, inward_time) for j in inn)
         except Exception as e:
             errors.append(f"{origin}→{destination}: {e}")
-    return all_journeys, errors
+    return all_outward, all_inward, errors
 
 
 
 def _collect_slots(user_input: str, state: dict[str, Any], debug: bool) -> dict[str, Any] | None:
     """Extract fields from the user message. Returns a follow-up response if slots are still
     missing, or None when all required slots are filled and search can proceed."""
+
+    # Snapshot completeness BEFORE extraction so we can detect if this message
+    # actually added anything new, or whether the user is just reacting to results.
+    was_complete = _is_complete(state)
+
     extracted = _extract_ticket_fields(user_input, state)
     _update_state(state, extracted)
+
     if _is_complete(state):
+        # If the state was already complete and the LLM extracted no new field
+        # values, the user is commenting on the results (e.g. "it's expensive"),
+        # not requesting a fresh search. Acknowledge and offer to refine.
+        no_new_fields = not any(
+            extracted.get(k) and str(extracted.get(k, "")).lower() not in ("none", "null", "")
+            for k in ("origin", "destination", "departure_time", "return_time")
+        )
+        if was_complete and no_new_fields:
+            resp: dict[str, Any] = {
+                "kind": "ticket_search",
+                "done": False,
+                "message": (
+                    "Those are the best fares available for that journey. "
+                    "Would you like to try a different departure time, date, or route?"
+                ),
+            }
+            if debug:
+                resp["ticket_debug"] = {"step": "comment_on_results", "state": dict(state)}
+            return resp
         return None
+
     question = extracted.get("next_question") or "Please tell me your origin, destination, and departure time."
-    resp: dict[str, Any] = {"kind": "ticket_search", "done": False, "message": question}
+    resp = {"kind": "ticket_search", "done": False, "message": question}
     if debug:
         resp["ticket_debug"] = {"step": "collecting_fields", "state": dict(state)}
     return resp
@@ -354,56 +408,60 @@ def _run_search(state: dict[str, Any], debug: bool) -> dict[str, Any]:
     dbg["pairs_searched"] = [f"{o}→{d}" for o in origin_codes for d in dest_codes]
 
     # Call RTJP for every origin×destination pair
-    all_journeys, search_errors = _search_all_pairs(origin_codes, dest_codes, depart_by, inward_time)
-    dbg["journeys_found"] = len(all_journeys)
+    all_outward, all_inward, search_errors = _search_all_pairs(origin_codes, dest_codes, depart_by, inward_time)
+    dbg["journeys_found"] = len(all_outward)
     if search_errors:
         dbg["search_errors"] = search_errors
 
-    if not all_journeys:
+    is_return = inward_time is not None
+
+    if not all_outward:
         dbg["step"] = "api_fallback"
-        outbound = _booking_link(origin_codes[0], dest_codes[0], depart_by, is_return=inward_time is not None)
+        outbound = _booking_link(origin_codes[0], dest_codes[0], depart_by)
         msg = (
             f"I couldn't retrieve live fares right now, but you can check prices and book here: "
             f"[National Rail journey planner]({outbound})"
         )
         if inward_time:
-            inbound = _booking_link(dest_codes[0], origin_codes[0], inward_time, is_return=True)
-            msg += f"\n\nReturn journey: [National Rail journey planner]({inbound})"
-        state.update(default_ticket_state())
+            inbound = _booking_link(dest_codes[0], origin_codes[0], inward_time)
+            msg += f"\n\nReturn journey (single ticket): [National Rail journey planner]({inbound})"
+        # Keep origin/destination/departure_time for follow-up queries; only clear return_time
+        state["return_time"] = None
         resp = {"kind": "ticket_search", "done": True, "message": msg, "journeys": []}
         if debug:
             resp["ticket_debug"] = dbg
         return resp
 
-    # Filter to ±3 h window, sort by price, take top 5
-    window = timedelta(hours=3)
-    in_window = [j for j in all_journeys if abs((j["dep_dt"] - depart_by).total_seconds()) <= window.total_seconds()]
-    top5 = sorted(in_window or all_journeys, key=lambda j: j["pence"])[:5]
+    # Pick top-5 outward journeys (±3 h window, sorted by price)
+    top5_out = _pick_top5(all_outward, depart_by)
 
-    # Point all booking links in each group at the cheapest journey's departure time
-    is_return = inward_time is not None
-    groups: dict[tuple[str, str], list[dict]] = {}
-    for j in top5:
-        groups.setdefault((j["origin"], j["destination"]), []).append(j)
-    for (orig, dest), group in groups.items():
-        shared_link = _booking_link(orig, dest, min(group, key=lambda j: j["pence"])["dep_dt"], is_return)
-        for j in group:
-            j["link"] = shared_link
-
-    lines = [
+    lines = ["**Outward journeys (single ticket):**"] + [
         f"{i}. {j['origin']} → {j['destination']} | dep {j['departure']} arr {j['arrival']} | from {j['price']} - [Book ticket]({j['link']})"
-        for i, j in enumerate(top5, 1)
+        for i, j in enumerate(top5_out, 1)
     ]
+
+    # Pick top-5 return journeys when the user asked for a return
+    top5_in: list[dict] = []
+    if is_return and all_inward and inward_time:
+        top5_in = _pick_top5(all_inward, inward_time)
+        lines += ["", "**Return journeys (single ticket):**"] + [
+            f"{i}. {j['origin']} → {j['destination']} | dep {j['departure']} arr {j['arrival']} | from {j['price']} - [Book ticket]({j['link']})"
+            for i, j in enumerate(top5_in, 1)
+        ]
+
     note   = "Note: departure time was assumed.\n" if assumed else ""
     plural = f"Searched {len(origin_codes)}×{len(dest_codes)} station combinations.\n" if len(origin_codes) + len(dest_codes) > 2 else ""
 
-    state.update(default_ticket_state())
+    # Keep origin/destination/departure_time so the user can say "also want a return at X"
+    # without repeating their journey details. Only wipe return_time (already shown).
+    state["return_time"] = None
 
+    all_top5 = top5_out + top5_in
     resp = {
         "kind":     "ticket_search",
         "done":     True,
         "message":  note + plural + "\n".join(lines),
-        "journeys": [{k: v for k, v in j.items() if k not in ("pence", "dep_dt")} for j in top5],
+        "journeys": [{k: v for k, v in j.items() if k not in ("pence", "dep_dt")} for j in all_top5],
     }
     if debug:
         dbg["step"] = "success"

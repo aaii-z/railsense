@@ -1,39 +1,45 @@
 # UI
-streamlit
+streamlit>=1.55,<2
 
 # Voice
-openai-whisper
+openai-whisper>=20250625
 
 # Database
-psycopg2-binary
-pgvector
+psycopg2-binary>=2.9,<3
+pgvector>=0.4,<1
 
 # Embeddings
-sentence-transformers
+sentence-transformers>=5.3,<6
 
 # ML - Task 2
-scikit-learn
-pandas
-numpy
-lightgbm
-xgboost
+scikit-learn>=1.8,<2
+pandas>=2.3,<3
+numpy>=2.4,<3
+lightgbm>=4.6,<5
+xgboost>=3.2,<4
 
 # Document parsing - Task 3 KB
-python-pptx
-python-docx
+python-pptx>=1.0,<2
+python-docx>=1.2,<2
 
 # Task 1 - ticket search
-requests
+requests>=2.33,<3
 
 # Utils
-python-dotenv
+python-dotenv>=1.2,<2
 
 # Visualization
-matplotlib
+matplotlib>=3.10,<4
 
 # SOAP - National Rail OJP (jpservices.wsdl)
-zeep
+zeep>=4.3,<5
 
+# LLM client
+openai>=2.37,<3
 
-openai
-rapidfuzz
+# Fuzzy matching
+rapidfuzz>=3.14,<4
+
+# Load testing
+pytest-benchmark>=5.0,<6
+locust>=2.0,<3

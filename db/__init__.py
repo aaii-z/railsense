@@ -9,6 +9,7 @@ DB_URL = os.environ.get("DATABASE_URL", "postgresql://railsense:railsense@localh
 
 _pool: psycopg2.pool.ThreadedConnectionPool | None = None
 _pool_lock = threading.Lock()
+_registered_conns: set[int] = set()
 
 
 def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
@@ -21,8 +22,15 @@ def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
 
 
 def get_conn():
-    conn = _get_pool().getconn()
-    register_vector(conn)
+    pool = _get_pool()
+    conn = pool.getconn()
+    try:
+        if id(conn) not in _registered_conns:
+            register_vector(conn)
+            _registered_conns.add(id(conn))
+    except Exception:
+        pool.putconn(conn)
+        raise
     return conn
 
 
