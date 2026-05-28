@@ -194,9 +194,11 @@ if st.session_state.page == "login":
         st.rerun()
 
     st.title("Staff Login")
-    username = st.text_input("Username", key="login_username")
-    password = st.text_input("Password", type="password", key="login_password")
+    st.text_input("Username", key="login_username")
+    st.text_input("Password", type="password", key="login_password")
     if st.button("Log in", key="login_submit", type="primary"):
+        username = st.session_state.get("login_username", "")
+        password = st.session_state.get("login_password", "")
         if authenticate(username, password):
             st.session_state.is_staff = True
             st.session_state.page = "chat"
@@ -292,18 +294,11 @@ _is_fresh = (
     len(st.session_state.messages) == 1
     and st.session_state.messages[0]["role"] == "assistant"
 )
-if _is_fresh:
-    if st.session_state.is_staff:
-        _chips = [
-            ("📋 Station emergency procedure", "What is the evacuation procedure for the station?"),
-            ("👥 Crowd management", "How do I manage crowds during a disruption?"),
-            ("📞 Escalation contacts", "Who should I escalate to during a major incident?"),
-        ]
-    else:
-        _chips = [
-            ("🎫 Find a cheap ticket", "I want to find the cheapest train ticket for my journey"),
-            ("⏱️ My train is delayed", "My train is delayed, can you predict arrival?"),
-        ]
+if _is_fresh and not st.session_state.is_staff:
+    _chips = [
+        ("🎫 Find a cheap ticket", "I want to find the cheapest train ticket for my journey"),
+        ("⏱️ My train is delayed", "My train is delayed, can you predict arrival?"),
+    ]
     _chip_cols = st.columns(len(_chips))
     for _i, (_label, _prompt) in enumerate(_chips):
         with _chip_cols[_i]:
