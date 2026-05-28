@@ -59,7 +59,7 @@ def _spinner_text(dialogue_state: dict, user_input: str) -> str:
         return "⏱️ Running delay prediction..."
     if active == "contingency":
         return "📋 Searching contingency plans..."
-    # No active task yet — peek at keywords in the message
+    # No active task yet  peek at keywords in the message
     msg = user_input.lower()
     if any(w in msg for w in ("ticket", "fare", "book", "journey", "travel", "cheapest", "single", "return")):
         return "🔍 Searching live fares..."
@@ -77,7 +77,7 @@ def _slot_progress(dialogue_state: dict) -> None:
         filled = [label for key, label in required if ts.get(key)]
         n, total = len(filled), len(required)
         if 0 < n < total:
-            st.progress(n / total, text=f"Journey details — collected: {', '.join(filled)}")
+            st.progress(n / total, text=f"Journey details  collected: {', '.join(filled)}")
     elif active == "delay_prediction":
         ds = dialogue_state.get("delay_state", {})
         required = [
@@ -87,7 +87,28 @@ def _slot_progress(dialogue_state: dict) -> None:
         filled = [label for key, label in required if ds.get(key)]
         n, total = len(filled), len(required)
         if 0 < n < total:
-            st.progress(n / total, text=f"Delay details — collected: {', '.join(filled)}")
+            st.progress(n / total, text=f"Delay details  collected: {', '.join(filled)}")
+
+
+def _render_assistant_extras(msg: dict) -> None:
+    journeys = msg.get("journeys")
+    prediction = msg.get("prediction")
+    weather = msg.get("weather")
+    debug = msg.get("debug")
+    if journeys:
+        _render_journeys(journeys)
+    if prediction:
+        st.json(prediction)
+    if weather:
+        with st.container(border=True):
+            st.markdown(
+                f"**{weather.get('icon', '')} {weather.get('location', '')}**  "
+                f"{weather.get('condition', '')} {weather.get('temperature_c', '')}°C | "
+                f"Wind {weather.get('wind_speed_kmh', '')} km/h"
+            )
+    if debug:
+        with st.expander("Debug details"):
+            st.json(debug)
 
 
 def _render_journeys(journeys: list) -> None:
@@ -112,16 +133,12 @@ def _render_journeys(journeys: list) -> None:
 
 
 # Sidebar: conversation history
-if "expanded_sessions" not in st.session_state:
-    st.session_state.expanded_sessions = set()
-
 with st.sidebar:
     if st.button("+ New chat", key="sidebar_new_chat", use_container_width=True, type="primary"):
         st.session_state.session_id = str(uuid.uuid4())
         greeting = STAFF_GREETING if st.session_state.is_staff else GREETING
         st.session_state.messages = [{"role": "assistant", "content": greeting}]
         st.session_state.dialogue_state = init_dialogue_state()
-        st.session_state.expanded_sessions.discard(st.session_state.session_id)
         st.rerun()
 
     st.divider()
@@ -144,55 +161,30 @@ with st.sidebar:
         sid = s["session_id"]
         label = s["label"][:38] + "…" if len(s["label"]) > 38 else s["label"]
         is_active = sid == current_sid
-        is_expanded = sid in st.session_state.expanded_sessions
 
-        c1, c2 = st.columns([5, 1])
-        with c1:
-            btn_label = ("● " if is_active else "") + label
-            if st.button(
-                btn_label,
-                key=f"sess_{sid}",
-                use_container_width=True,
-                type="primary" if is_active else "secondary",
-            ):
-                if not is_active:
-                    msgs = get_session_messages(sid)
-                    st.session_state.session_id = sid
-                    st.session_state.messages = [
-                        {
-                            "role": m["role"],
-                            "content": m["content"],
-                            **(m.get("extras") or {}),
-                        }
-                        for m in msgs
-                    ] or [{"role": "assistant", "content": STAFF_GREETING if st.session_state.is_staff else GREETING}]
-                    st.session_state.dialogue_state = init_dialogue_state()
-                    st.session_state.dialogue_state["history"] = [
-                        {"role": m["role"], "content": m["content"]} for m in msgs
-                    ][-20:]
-                    st.rerun()
-        with c2:
-            arrow = "▲" if is_expanded else "▼"
-            if st.button(arrow, key=f"toggle_{sid}"):
-                if is_expanded:
-                    st.session_state.expanded_sessions.discard(sid)
-                else:
-                    st.session_state.expanded_sessions.add(sid)
+        btn_label = ("● " if is_active else "") + label
+        if st.button(
+            btn_label,
+            key=f"sess_{sid}",
+            use_container_width=True,
+            type="primary" if is_active else "secondary",
+        ):
+            if not is_active:
+                msgs = get_session_messages(sid)
+                st.session_state.session_id = sid
+                st.session_state.messages = [
+                    {
+                        "role": m["role"],
+                        "content": m["content"],
+                        **(m.get("extras") or {}),
+                    }
+                    for m in msgs
+                ] or [{"role": "assistant", "content": STAFF_GREETING if st.session_state.is_staff else GREETING}]
+                st.session_state.dialogue_state = init_dialogue_state()
+                st.session_state.dialogue_state["history"] = [
+                    {"role": m["role"], "content": m["content"]} for m in msgs
+                ][-20:]
                 st.rerun()
-
-        if is_expanded:
-            if is_active:
-                preview_msgs = st.session_state.messages
-            else:
-                try:
-                    preview_msgs = get_session_messages(sid)
-                except Exception:
-                    preview_msgs = []
-            for m in preview_msgs:
-                prefix = "**You:** " if m["role"] == "user" else "**Bot:** "
-                snippet = m["content"][:80] + "…" if len(m["content"]) > 80 else m["content"]
-                st.caption(prefix + snippet)
-            st.markdown("---")
 
 
 # Login page
@@ -282,7 +274,7 @@ with col_auth:
 
 if st.session_state.is_staff:
     st.info(
-        "🔐 **Staff Portal** — You have access to operational contingency guidance and disruption plans.",
+        "🔐 **Staff Portal**  You have access to operational contingency guidance and disruption plans.",
         icon="🚉",
     )
 
@@ -290,29 +282,12 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
         if msg["role"] == "assistant":
-            journeys = msg.get("journeys")
-            prediction = msg.get("prediction")
-            weather = msg.get("weather")
-            debug = msg.get("debug")
-            if journeys:
-                _render_journeys(journeys)
-            if prediction:
-                st.json(prediction)
-            if weather:
-                with st.container(border=True):
-                    st.markdown(
-                        f"**{weather.get('icon', '')} {weather.get('location', '')}** — "
-                        f"{weather.get('condition', '')} {weather.get('temperature_c', '')}°C | "
-                        f"Wind {weather.get('wind_speed_kmh', '')} km/h"
-                    )
-            if debug:
-                with st.expander("Debug details"):
-                    st.json(debug)
+            _render_assistant_extras(msg)
         if msg.get("timestamp"):
             st.caption(msg["timestamp"])
 
 
-# Quick-start prompt chips — only shown on a fresh chat (just the greeting)
+# Quick-start prompt chips  only shown on a fresh chat (just the greeting)
 _is_fresh = (
     len(st.session_state.messages) == 1
     and st.session_state.messages[0]["role"] == "assistant"
@@ -400,34 +375,17 @@ if st.session_state.text_to_process:
                 response = {"message": f"Unexpected UI error while generating a reply: {exc}"}
 
         st.write(response["message"])
-        journeys = response.get("journeys")
-        prediction = response.get("prediction")
-        weather = response.get("weather")
-        debug = response.get("debug")
-        if journeys:
-            _render_journeys(journeys)
-        if prediction:
-            st.json(prediction)
-        if weather:
-            with st.container(border=True):
-                st.markdown(
-                    f"**{weather.get('icon', '')} {weather.get('location', '')}** — "
-                    f"{weather.get('condition', '')} {weather.get('temperature_c', '')}°C | "
-                    f"Wind {weather.get('wind_speed_kmh', '')} km/h"
-                )
-        if debug:
-            with st.expander("Debug details"):
-                st.json(debug)
+        _render_assistant_extras(response)
         bot_ts = datetime.now().strftime("%H:%M:%S")
         st.caption(bot_ts)
 
     st.session_state.messages.append({
         "role": "assistant",
         "content": response["message"],
-        "journeys": journeys,
-        "prediction": prediction,
-        "weather": weather,
-        "debug": debug,
+        "journeys": response.get("journeys"),
+        "prediction": response.get("prediction"),
+        "weather": response.get("weather"),
+        "debug": response.get("debug"),
         "timestamp": bot_ts,
     })
     st.rerun()

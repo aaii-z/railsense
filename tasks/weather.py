@@ -1,9 +1,3 @@
-"""
-Weather info panel using Open-Meteo (free, no API key).
-
-Provides current conditions and a short forecast for a given station/city.
-"""
-
 import logging
 from dataclasses import dataclass
 from functools import lru_cache
@@ -221,28 +215,3 @@ def get_weather(place: str, arrival_time: str | None = None) -> WeatherInfo | No
     )
 
 
-def format_weather_markdown(weather: WeatherInfo) -> str:
-    """Format weather info as a compact markdown block for the chat UI."""
-    if weather.arrival_time:
-        header = (
-            f"**{weather.icon} Weather at arrival ({weather.arrival_time}) in {weather.location}:** "
-            f"{weather.condition}, {weather.temperature_c:.0f}°C "
-            f"(feels like {weather.feels_like_c:.0f}°C)"
-        )
-    else:
-        header = (
-            f"**{weather.icon} Weather in {weather.location}:** "
-            f"{weather.condition}, {weather.temperature_c:.0f}°C "
-            f"(feels like {weather.feels_like_c:.0f}°C)"
-        )
-    lines = [
-        header,
-        f"Wind: {weather.wind_speed_kmh:.0f} km/h | Humidity: {weather.humidity_percent}%",
-    ]
-    if weather.forecast_hours:
-        parts = []
-        for h in weather.forecast_hours[:4]:
-            rain = f" {h['rain_percent']}%☔" if h.get("rain_percent") and h["rain_percent"] > 20 else ""
-            parts.append(f"{h['time']} {h['icon']} {h['temp_c']:.0f}°{rain}")
-        lines.append("Forecast: " + " | ".join(parts))
-    return "\n".join(lines)

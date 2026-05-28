@@ -12,6 +12,8 @@ if str(_ROOT) not in sys.path:
 
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.linear_model import Ridge
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.neural_network import MLPRegressor
 from sklearn.model_selection import GroupShuffleSplit, RandomizedSearchCV, GroupKFold
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.impute import SimpleImputer
@@ -27,7 +29,7 @@ SAVE_DIR = str(_ROOT / "models" / "task2")
 PLOT_DIR = str(_ROOT / "models" / "task2" / "plots")
 os.makedirs(PLOT_DIR, exist_ok=True)
 
-PALETTE = ["#20808D", "#A84B2F", "#1B474D", "#944454", "#FFC553", "#848456"]
+PALETTE = ["#20808D", "#A84B2F", "#1B474D", "#944454", "#FFC553", "#848456", "#6C5B9E"]
 
 plt.rcParams.update({
     "figure.dpi": 150,
@@ -64,7 +66,7 @@ def plot_before_after(baseline_results, tuned_results, model_names, plot_dir):
     x     = np.arange(len(model_names))
     width = 0.35
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    fig.suptitle("Hyperparameter Tuning — Before vs After",
+    fig.suptitle("Hyperparameter Tuning  Before vs After",
                  fontsize=14, fontweight="bold", y=1.02)
 
     for ax, metric, title, ylabel in [
@@ -119,7 +121,7 @@ def plot_r2(baseline_results, tuned_results, model_names, plot_dir):
     ax.set_xticks(x)
     ax.set_xticklabels(model_names, fontsize=9)
     ax.set_ylabel("R²")
-    ax.set_title("R² Score — Baseline vs Tuned")
+    ax.set_title("R² Score  Baseline vs Tuned")
     ax.legend(fontsize=9)
     ax.axhline(0, color="#28251D", lw=0.8, linestyle="--")
     plt.tight_layout()
@@ -164,7 +166,7 @@ def plot_within_n(tuned_results, model_names, plot_dir):
     ax.set_xticks(x2)
     ax.set_xticklabels(model_names, fontsize=9)
     ax.set_ylabel("% of Predictions")
-    ax.set_title("Within-N-Minutes Accuracy — Tuned Models")
+    ax.set_title("Within-N-Minutes Accuracy  Tuned Models")
     ax.legend(loc="lower right", fontsize=9)
     ax.set_ylim(0, 110)
     plt.tight_layout()
@@ -174,8 +176,10 @@ def plot_within_n(tuned_results, model_names, plot_dir):
 
 
 def plot_actual_vs_predicted(tuned_results, model_names, y_test, plot_dir):
-    fig, axes = plt.subplots(2, 3, figsize=(15, 10))
-    fig.suptitle("Actual vs Predicted — Tuned Models", fontsize=14, fontweight="bold")
+    n_cols = 3
+    n_rows = (len(model_names) + n_cols - 1) // n_cols
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 5 * n_rows))
+    fig.suptitle("Actual vs Predicted  Tuned Models", fontsize=14, fontweight="bold")
     axes_flat = axes.flatten()
     sample    = np.random.RandomState(14).choice(
         len(y_test), size=min(5000, len(y_test)), replace=False)
@@ -194,7 +198,9 @@ def plot_actual_vs_predicted(tuned_results, model_names, y_test, plot_dir):
                      f"MAE={tuned_results[name]['MAE']:.2f} min")
         ax.legend(fontsize=8)
 
-    axes_flat[-1].set_visible(False)
+    for ax in axes_flat[len(model_names):]:
+        ax.set_visible(False)
+
     plt.tight_layout()
     plt.savefig(os.path.join(plot_dir, "11_tuned_actual_vs_predicted.png"),
                 dpi=150, bbox_inches="tight")
@@ -219,7 +225,7 @@ def plot_heatmap(tuned_results, model_names, plot_dir):
         else:
             norm[:, col_i] = (norm[:, col_i] - lo) / (hi - lo)
 
-    fig, ax = plt.subplots(figsize=(13, 5))
+    fig, ax = plt.subplots(figsize=(13, max(5, len(model_names))))
     im = ax.imshow(norm, cmap=plt.get_cmap("YlGn"), aspect="auto", vmin=0, vmax=1)
     ax.set_xticks(range(6))
     ax.set_xticklabels(metrics_display, fontsize=10)
@@ -244,7 +250,14 @@ def plot_heatmap(tuned_results, model_names, plot_dir):
 
 
 if __name__ == "__main__":
-    print("--- Preprocessing ---")
+    import time as _time
+    _t0_total = _time.time()
+
+    def _elapsed():
+        m, s = divmod(int(_time.time() - _t0_total), 60)
+        return f"[{m:02d}:{s:02d}]"
+
+    print(f"{_elapsed()} --- Preprocessing ---")
     X, y, encoder, df = run_preprocessing(DATA_DIR, SAVE_DIR)
     groups = df["journey_id"].values
     print(f"  {len(df):,} rows | {df['journey_id'].nunique():,} journeys")
@@ -252,18 +265,28 @@ if __name__ == "__main__":
     imputer = SimpleImputer(strategy="median")
     X = imputer.fit_transform(X)
 
-    print("\n--- Train/Test Split ---")
-    gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=14)
-    train_idx, test_idx = next(gss.split(X, y, groups=groups))
-    X_train, X_test = X[train_idx], X[test_idx]
-    y_train, y_test = y[train_idx], y[test_idx]
-    g_train         = groups[train_idx]
-    print(f"  Train: {len(X_train):,}  |  Test: {len(X_test):,}")
+    print("\n--- Train / Validation / Test Split (70 / 15 / 15) ---")
+    # Step 1: carve out 15% test
+    gss_test = GroupShuffleSplit(n_splits=1, test_size=0.15, random_state=14)
+    trainval_idx, test_idx = next(gss_test.split(X, y, groups=groups))
+    # Step 2: from the remaining 85%, carve out ~17.6% as val → ~15% of total
+    gss_val = GroupShuffleSplit(n_splits=1, test_size=0.176, random_state=14)
+    rel_train_idx, rel_val_idx = next(
+        gss_val.split(X[trainval_idx], y[trainval_idx], groups=groups[trainval_idx])
+    )
+    train_idx = trainval_idx[rel_train_idx]
+    val_idx   = trainval_idx[rel_val_idx]
+
+    X_train, y_train = X[train_idx], y[train_idx]
+    X_val,   y_val   = X[val_idx],   y[val_idx]
+    X_test,  y_test  = X[test_idx],  y[test_idx]
+    g_train = groups[train_idx]
+    print(f"  Train: {len(X_train):,}  |  Val: {len(X_val):,}  |  Test: {len(X_test):,}")
 
     cv = GroupKFold(n_splits=3)
 
     # ── Baseline models ────────────────────────────────────────────────────────
-    print("\n--- Baseline Models ---")
+    print(f"\n{_elapsed()} --- Baseline Models (1/5) ---")
     baseline_models = {
         "Ridge": Pipeline([
             ("scaler", StandardScaler()),
@@ -283,17 +306,32 @@ if __name__ == "__main__":
             n_estimators=100, max_depth=6, learning_rate=0.05,
             random_state=14, n_jobs=-1, verbose=-1
         ),
+        "KNN": Pipeline([
+            ("scaler", StandardScaler()),
+            ("model",  KNeighborsRegressor(n_neighbors=10)),
+        ]),
+        "MLP": Pipeline([
+            ("scaler", StandardScaler()),
+            ("model",  MLPRegressor(
+                hidden_layer_sizes=(128, 64),
+                max_iter=100,
+                early_stopping=True,
+                random_state=14,
+            )),
+        ]),
     }
 
     baseline_results = {}
-    for name, model in baseline_models.items():
-        print(f"  {name}...", end=" ", flush=True)
+    n_baselines = len(baseline_models)
+    for i, (name, model) in enumerate(baseline_models.items(), 1):
+        print(f"  {_elapsed()} [{i}/{n_baselines}] {name}...", end=" ", flush=True)
+        _t0 = _time.time()
         res = evaluate(model, X_train, y_train, X_test, y_test)
         baseline_results[name] = res
-        print(f"MAE={res['MAE']:.3f}  RMSE={res['RMSE']:.3f}  R²={res['R2']:.4f}")
+        print(f"MAE={res['MAE']:.3f}  RMSE={res['RMSE']:.3f}  R²={res['R2']:.4f}  ({_time.time()-_t0:.0f}s)")
 
     # ── Hyperparameter tuning ──────────────────────────────────────────────────
-    print("\n--- Hyperparameter Tuning (RandomizedSearchCV) ---")
+    print(f"\n{_elapsed()} --- Hyperparameter Tuning (2/5) ---")
     search_configs = {
         "Ridge": {
             "estimator": Pipeline([("scaler", StandardScaler()), ("model", Ridge(solver="lsqr"))]),
@@ -309,7 +347,7 @@ if __name__ == "__main__":
                 "max_depth":    [5, 10, 20],
                 "max_features": ["sqrt", "log2", 0.5],
             },
-            "n_iter": 9,
+            "n_iter": 6,
         },
         "Gradient Boosting": {
             "estimator": GradientBoostingRegressor(random_state=14),
@@ -318,7 +356,7 @@ if __name__ == "__main__":
                 "max_depth":     [3, 4, 5],
                 "learning_rate": [0.01, 0.05, 0.1],
             },
-            "n_iter": 9,
+            "n_iter": 6,
         },
         "XGBoost": {
             "estimator": xgb.XGBRegressor(random_state=14, n_jobs=1, verbosity=0),
@@ -327,7 +365,7 @@ if __name__ == "__main__":
                 "learning_rate": [0.01, 0.05, 0.1],
                 "subsample":     [0.7, 0.8, 1.0],
             },
-            "n_iter": 9,
+            "n_iter": 6,
         },
         "LightGBM": {
             "estimator": lgb.LGBMRegressor(random_state=14, n_jobs=1, verbose=-1),
@@ -336,16 +374,41 @@ if __name__ == "__main__":
                 "learning_rate": [0.01, 0.05, 0.1],
                 "subsample":     [0.7, 0.8, 1.0],
             },
-            "n_iter": 9,
+            "n_iter": 6,
+        },
+        "KNN": {
+            "estimator": Pipeline([
+                ("scaler", StandardScaler()),
+                ("model",  KNeighborsRegressor()),
+            ]),
+            "param_dist": {
+                "model__n_neighbors": [5, 10, 20, 50],
+                "model__weights":     ["uniform", "distance"],
+                "model__metric":      ["euclidean", "manhattan"],
+            },
+            "n_iter": 6,
+        },
+        "MLP": {
+            "estimator": Pipeline([
+                ("scaler", StandardScaler()),
+                ("model",  MLPRegressor(max_iter=100, early_stopping=True, random_state=14)),
+            ]),
+            "param_dist": {
+                "model__hidden_layer_sizes": [(64,), (128, 64)],
+                "model__learning_rate_init": [0.001, 0.01],
+            },
+            "n_iter": 4,
         },
     }
 
     tuned_models  = {}
     tuned_results = {}
     best_params   = {}
+    n_configs = len(search_configs)
 
-    for name, cfg in search_configs.items():
-        print(f"\n  Tuning {name} ({cfg['n_iter']} iterations × 3-fold CV)...")
+    for i, (name, cfg) in enumerate(search_configs.items(), 1):
+        print(f"\n  {_elapsed()} [{i}/{n_configs}] Tuning {name} ({cfg['n_iter']} iters × 3-fold CV)...")
+        _t0 = _time.time()
         search = RandomizedSearchCV(
             estimator           = cfg["estimator"],
             param_distributions = cfg["param_dist"],
@@ -359,7 +422,7 @@ if __name__ == "__main__":
         )
         search.fit(X_train, y_train, groups=g_train)
         best_params[name] = search.best_params_
-        print(f"    Best params: {search.best_params_}")
+        print(f"    Best params: {search.best_params_}  ({_time.time()-_t0:.0f}s)")
 
         tuned_model = search.best_estimator_
         tuned_models[name] = tuned_model
@@ -369,12 +432,61 @@ if __name__ == "__main__":
         print(f"    MAE={res['MAE']:.3f}  RMSE={res['RMSE']:.3f}  R²={res['R2']:.4f}  "
               f"(ΔMAE={improvement:+.3f})")
 
+        slug = name.lower().replace(" ", "_")
+        model_path = os.path.join(SAVE_DIR, f"{slug}.pkl")
+        with open(model_path, "wb") as f:
+            pickle.dump(tuned_model, f)
+        print(f"    Saved → {model_path}")
+
     with open(os.path.join(SAVE_DIR, "best_params.json"), "w") as f:
         json.dump(best_params, f, indent=2, default=str)
     print(f"\n  Best params saved to {SAVE_DIR}/best_params.json")
 
+    # ── Pick best single model and save as best_<model>.pkl (3/5) ──────────────
+    winner      = min(tuned_results, key=lambda n: tuned_results[n]["MAE"])
+    winner_slug = winner.lower().replace(" ", "_")
+    best_path   = os.path.join(SAVE_DIR, f"best_{winner_slug}.pkl")
+    with open(best_path, "wb") as f:
+        pickle.dump(tuned_models[winner], f)
+    print(f"\n  ✓ Best single model : {winner}")
+    print(f"    MAE={tuned_results[winner]['MAE']:.3f}  "
+          f"R²={tuned_results[winner]['R2']:.4f}")
+    print(f"    Saved as best_{winner_slug}.pkl → {best_path}")
+
+    # ── Weighted Ensemble (WE) ─────────────────────────────────────────────────
+    print(f"\n{_elapsed()} --- Weighted Ensemble (3/5) ---")
+    val_r2 = {}
+    for name, model in tuned_models.items():
+        val_r2[name] = float(r2_score(y_val, model.predict(X_val)))
+        print(f"  {name:<20} val R²={val_r2[name]:.4f}")
+
+    # Clip negative R² to 0 so a bad model doesn't pull predictions the wrong way
+    weights    = {name: max(v, 0.0) for name, v in val_r2.items()}
+    total_w    = sum(weights.values()) or 1.0  # guard against all-zero edge case
+    norm_w     = {name: w / total_w for name, w in weights.items()}
+
+    y_pred_we = sum(
+        norm_w[name] * tuned_models[name].predict(X_test)
+        for name in tuned_models
+    )
+    we_mae    = float(mean_absolute_error(y_test, y_pred_we))
+    we_rmse   = float(np.sqrt(mean_squared_error(y_test, y_pred_we)))
+    we_r2     = float(r2_score(y_test, y_pred_we))
+    we_w2     = float(np.mean(np.abs(y_pred_we - y_test) <= 2)  * 100)
+    we_w5     = float(np.mean(np.abs(y_pred_we - y_test) <= 5)  * 100)
+    we_w10    = float(np.mean(np.abs(y_pred_we - y_test) <= 10) * 100)
+
+    print(f"\n  Weighted Ensemble  MAE={we_mae:.3f}  RMSE={we_rmse:.3f}  R²={we_r2:.4f}")
+    print(f"  Within 2/5/10 min: {we_w2:.1f}% / {we_w5:.1f}% / {we_w10:.1f}%")
+    print(f"  Weights: { {n: f'{w:.3f}' for n, w in norm_w.items()} }")
+
+    ensemble_path = os.path.join(SAVE_DIR, "weighted_ensemble.pkl")
+    with open(ensemble_path, "wb") as f:
+        pickle.dump({"models": tuned_models, "weights": norm_w}, f)
+    print(f"  Saved → {ensemble_path}")
+
     # ── Plots ──────────────────────────────────────────────────────────────────
-    print("\n--- Plots ---")
+    print(f"\n{_elapsed()} --- Plots (4/5) ---")
     model_names = list(baseline_results.keys())
     plot_before_after(baseline_results, tuned_results, model_names, PLOT_DIR)
     plot_r2(baseline_results, tuned_results, model_names, PLOT_DIR)
@@ -384,13 +496,18 @@ if __name__ == "__main__":
     plot_heatmap(tuned_results, model_names, PLOT_DIR)
 
     # ── Summary table ──────────────────────────────────────────────────────────
-    print("\n" + "="*70)
-    print(f"{'Model':<20} {'Base MAE':>9} {'Tuned MAE':>10} {'ΔMAE':>8} {'Tuned R²':>10}")
+    print(f"\n{_elapsed()} --- Summary (5/5) ---")
+    print("="*70)
+    print(f"{'Model':<22} {'Base MAE':>9} {'Tuned MAE':>10} {'ΔMAE':>8} {'Tuned R²':>10}")
     print("-"*70)
     for name in model_names:
         b = baseline_results[name]["MAE"]
         t = tuned_results[name]["MAE"]
         r = tuned_results[name]["R2"]
-        print(f"{name:<20} {b:>9.3f} {t:>10.3f} {t-b:>+8.3f} {r:>10.4f}")
+        print(f"{name:<22} {b:>9.3f} {t:>10.3f} {t-b:>+8.3f} {r:>10.4f}")
+    print("-"*70)
+    print(f"{'Weighted Ensemble':<22} {'':>9} {we_mae:>10.3f} {'':>8} {we_r2:>10.4f}")
     print("="*70)
     print(f"\nAll plots saved to: {PLOT_DIR}")
+    m, s = divmod(int(_time.time() - _t0_total), 60)
+    print(f"\nDone in {m}m {s}s.")

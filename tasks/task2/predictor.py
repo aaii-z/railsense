@@ -27,11 +27,11 @@ TARGET_COLS = [
 ]
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_MODEL_PATH = _REPO_ROOT / "models" / "task2" / "random_forest.pkl"
-_ENCODER_PATH = _REPO_ROOT / "models" / "task2" / "station_encoder.pkl"
+_ENSEMBLE_PATH = _REPO_ROOT / "models" / "task2" / "msm1_ensemble.pkl"
+_ENCODER_PATH  = _REPO_ROOT / "models" / "task2" / "station_encoder.pkl"
 
-_MODEL = None
-_ENCODER = None
+_ENSEMBLE = None  # dict: {"models": {name: model}, "weights": {name: float}}
+_ENCODER  = None
 _ROUTE_NAME_LOOKUP = None
 _ROUTE_ALIAS_OVERRIDES = {
     "waterloo": "WAT",
@@ -53,22 +53,24 @@ def default_delay_state() -> dict[str, Any]:
 
 
 def _load_assets():
-    global _MODEL, _ENCODER
-    if _MODEL is None:
-        if not _MODEL_PATH.is_file():
+    global _ENSEMBLE, _ENCODER
+    if _ENSEMBLE is None:
+        if not _ENSEMBLE_PATH.is_file():
             raise FileNotFoundError(
-                f"Model file not found at {_MODEL_PATH}. Train Task 2 model first."
+                f"Ensemble file not found at {_ENSEMBLE_PATH}. "
+                "Run tasks/task2/model_comparison.py first."
             )
-        with _MODEL_PATH.open("rb") as f:
-            _MODEL = pickle.load(f)
+        with _ENSEMBLE_PATH.open("rb") as f:
+            _ENSEMBLE = pickle.load(f)
     if _ENCODER is None:
         if not _ENCODER_PATH.is_file():
             raise FileNotFoundError(
-                f"Encoder file not found at {_ENCODER_PATH}. Train Task 2 model first."
+                f"Encoder file not found at {_ENCODER_PATH}. "
+                "Run tasks/task2/model_comparison.py first."
             )
         with _ENCODER_PATH.open("rb") as f:
             _ENCODER = pickle.load(f)
-    return _MODEL, _ENCODER
+    return _ENSEMBLE, _ENCODER
 
 
 def _peak_hour(mins: int) -> int:
@@ -173,7 +175,7 @@ def predict_delay_minutes(
     has_delay_reason: int = 0,
     journey_date: str | None = None,
 ) -> float:
-    model, encoder = _load_assets()
+    ensemble, encoder = _load_assets()
 
     station_code = _normalise_station_code(station)
     destination_code = _normalise_station_code(destination)
@@ -198,7 +200,13 @@ def predict_delay_minutes(
             float(has_delay_reason),
         ]]
     )
-    return float(model.predict(features)[0])
+    models  = ensemble["models"]
+    weights = ensemble["weights"]
+    total_w = sum(weights.values()) or 1.0
+    return float(sum(
+        (weights[name] / total_w) * model.predict(features)[0]
+        for name, model in models.items()
+    ))
 
 
 def _extract_delay_fields(

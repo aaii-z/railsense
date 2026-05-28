@@ -1,0 +1,55 @@
+--- Loading data ---
+Loading cached processed data from /home/aaii/Projects/railsense/models/task2/
+  Loaded: 3,602,355 rows, 49,971 journeys
+  Val: 536,818  |  Test: 540,606
+
+--- Loading pre-trained models ---
+  loaded Ridge
+  loaded Random Forest
+  loaded Gradient Boosting
+  loaded XGBoost
+  loaded LightGBM
+  loaded KNN
+  loaded MLP
+
+--- MSM1 Greedy Selection (on val set) ---
+  Pre-computing val predictions...
+    Ridge                  R2=0.6383
+    Random Forest          R2=0.6660
+    Gradient Boosting      R2=0.6684
+    XGBoost                R2=0.6790
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+    LightGBM               R2=0.6783
+    KNN                    R2=0.6434
+    MLP                    R2=0.6613
+
+  Greedy selection:
+  + add 'XGBoost'  -> val MAE=2.7860  (size=1)
+  + add 'LightGBM'  -> val MAE=2.7769  (size=2)
+    skip 'Gradient Boosting' -> val MAE=2.7914  (no improvement)
+  + add 'Random Forest'  -> val MAE=2.7669  (size=3)
+    skip 'MLP' -> val MAE=2.7823  (no improvement)
+  + add 'KNN'  -> val MAE=2.7609  (size=4)
+    skip 'Ridge' -> val MAE=2.7762  (no improvement)
+
+  Final selected: ['XGBoost', 'LightGBM', 'Random Forest', 'KNN']
+
+  Computing test predictions...
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+
+--- MSM1 Ensemble -- Test Results ---
+  XGBoost                weight=0.255
+  LightGBM               weight=0.254
+  Random Forest          weight=0.250
+  KNN                    weight=0.241
+  MAE:           2.792 min
+  RMSE:          5.501 min
+  R2:            0.7130
+  Within 2 min:  59.8%
+  Within 5 min:  86.8%
+  Within 10 min: 95.5%
+
+  Saved -> /home/aaii/Projects/railsense/models/task2/msm1_ensemble.pkl
+

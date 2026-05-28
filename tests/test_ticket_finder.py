@@ -36,7 +36,7 @@ def test_parse_naive_gets_uk_tz():
 
 def test_booking_link_single():
     dt = datetime(2026, 6, 1, 9, 17, tzinfo=_UK)
-    url = _booking_link("SOU", "WAT", dt, is_return=False)
+    url = _booking_link("SOU", "WAT", dt)
     assert "type=single" in url
     assert "origin=SOU" in url
     assert "destination=WAT" in url
@@ -49,8 +49,8 @@ def test_booking_link_rounds_minutes():
 
 def test_booking_link_return():
     dt = datetime(2026, 6, 1, 9, 0, tzinfo=_UK)
-    url = _booking_link("SOU", "WAT", dt, is_return=True)
-    assert "type=return" in url
+    url = _booking_link("WAT", "SOU", dt)
+    assert "type=single" in url   # return leg is also booked as a single ticket
 
 
 # --- _is_complete ---

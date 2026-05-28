@@ -4,15 +4,16 @@ from pathlib import Path
 from docx import Document
 from pptx import Presentation
 from pgvector.psycopg2 import register_vector
-from sentence_transformers import SentenceTransformer
 
 from db import DB_URL
+from tasks.task3.retriever import _MODEL, _get_embedder
 
 DOCS_DIR = Path(__file__).resolve().parents[2] / "data" / "docs"
-CHUNK_SIZE    = 400   # words per chunk
-CHUNK_OVERLAP = 50    # overlap so we don't cut sentences in half
+CHUNK_SIZE    = 120   # words per chunk — smaller = more focused retrieval
+CHUNK_OVERLAP = 20    # overlap to avoid cutting sentences mid-thought
 
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
+# Table rows tend to be identical boilerplate across all stations and pollute retrieval
+_SKIP_SECTIONS = {"Table"}
 
 
 def extract_text_docx(path: Path) -> list[tuple[str, str]]:
@@ -93,34 +94,39 @@ def parse_filename(path: Path) -> tuple[str, str, str]:
     return station, region, doc_date
 
 
+_EXTRACTORS = {
+    ".docx": extract_text_docx,
+    ".doc":  extract_text_docx,
+    ".docm": extract_text_docx,
+    ".pptx": extract_text_pptx,
+    ".pptm": extract_text_pptx,
+}
+
+
 def ingest_file(path: Path, cursor) -> int:
     cursor.execute("SELECT 1 FROM documents WHERE source_file = %s LIMIT 1", (path.name,))
     if cursor.fetchone():
         print(f"  already ingested, skipping")
         return 0
 
-    station, region, doc_date = parse_filename(path)
-    suffix = path.suffix.lower()
-
-    if suffix in (".docx", ".doc", ".docm"):
-        try:
-            sections = extract_text_docx(path)
-        except Exception as e:
-            print(f"  Skipped {path.name}: {e}")
-            return 0
-    elif suffix in (".pptx", ".pptm"):
-        try:
-            sections = extract_text_pptx(path)
-        except Exception as e:
-            print(f"  Skipped {path.name}: {e}")
-            return 0
-    else:
+    extractor = _EXTRACTORS.get(path.suffix.lower())
+    if extractor is None:
         return 0
+
+    try:
+        sections = extractor(path)
+    except Exception as e:
+        print(f"  Skipped {path.name}: {e}")
+        return 0
+
+    station, region, doc_date = parse_filename(path)
 
     count = 0
     for section, text in sections:
+        if section in _SKIP_SECTIONS:
+            continue
         for chunk in chunk_text(text):
-            embedding = embedder.encode(chunk).tolist()
+            embedding = _get_embedder().encode(chunk).tolist()
             cursor.execute(
                 """
                 INSERT INTO documents (station, region, doc_date, source_file, section, chunk_text, embedding)

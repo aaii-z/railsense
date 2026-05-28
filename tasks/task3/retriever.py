@@ -1,52 +1,54 @@
 from sentence_transformers import SentenceTransformer
 
-from db import get_conn, put_conn
+from db import db_cursor
 
 _embedder: SentenceTransformer | None = None
+
+_MODEL = "multi-qa-MiniLM-L6-cos-v1"
 
 
 def _get_embedder() -> SentenceTransformer:
     global _embedder
     if _embedder is None:
-        _embedder = SentenceTransformer("all-MiniLM-L6-v2")
+        _embedder = SentenceTransformer(_MODEL)
     return _embedder
 
 
-def retrieve(query: str, top_k: int = 5, station: str | None = None) -> list[dict]:
+MIN_SCORE = 0.35
+
+
+def retrieve(
+    query: str,
+    top_k: int = 5,
+    station: str | None = None,
+    min_score: float = MIN_SCORE,
+) -> list[dict]:
+    """Return the top-k most relevant chunks, dropping any below min_score."""
     embedding = _get_embedder().encode(query).tolist()
 
-    conn = get_conn()
-    try:
-        cursor = conn.cursor()
-        try:
-            if station:
-                cursor.execute(
-                    """
-                    SELECT station, region, doc_date, section, chunk_text,
-                           1 - (embedding <=> %s::vector) AS score
-                    FROM documents
-                    WHERE station ILIKE %s
-                    ORDER BY embedding <=> %s::vector
-                    LIMIT %s
-                    """,
-                    (embedding, f"%{station}%", embedding, top_k)
-                )
-            else:
-                cursor.execute(
-                    """
-                    SELECT station, region, doc_date, section, chunk_text,
-                           1 - (embedding <=> %s::vector) AS score
-                    FROM documents
-                    ORDER BY embedding <=> %s::vector
-                    LIMIT %s
-                    """,
-                    (embedding, embedding, top_k)
-                )
-            rows = cursor.fetchall()
-        finally:
-            cursor.close()
-    finally:
-        put_conn(conn)
+    # Optionally narrow results to a specific station
+    station_filter = "AND station ILIKE %s" if station else ""
+    station_param  = [f"%{station}%"] if station else []
+
+    with db_cursor() as cur:
+        cur.execute(
+            f"""
+            SELECT station, region, doc_date, section, chunk_text, score
+            FROM (
+                SELECT DISTINCT ON (chunk_text)
+                       station, region, doc_date, section, chunk_text,
+                       1 - (embedding <=> %s::vector) AS score
+                FROM documents
+                WHERE section != 'Table'
+                {station_filter}
+                ORDER BY chunk_text, embedding <=> %s::vector
+            ) sub
+            ORDER BY score DESC
+            LIMIT %s
+            """,
+            (embedding, *station_param, embedding, top_k),
+        )
+        rows = cur.fetchall()
 
     return [
         {
@@ -58,6 +60,7 @@ def retrieve(query: str, top_k: int = 5, station: str | None = None) -> list[dic
             "score":      round(float(row[5]), 4),
         }
         for row in rows
+        if float(row[5]) >= min_score
     ]
 
 

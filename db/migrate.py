@@ -1,14 +1,3 @@
-"""
-Lightweight migration runner.
-
-Tracks applied migrations in a `schema_migrations` table.
-Migrations are numbered SQL files in db/migrations/ (e.g. 0001_initial_schema.sql).
-
-Usage:
-    python -m db.migrate          # apply all pending migrations
-    python -m db.migrate --status # show applied/pending
-"""
-
 import argparse
 import sys
 from pathlib import Path

@@ -1,7 +1,7 @@
 import time
 
 from llm.client import chat_text
-from tasks.task3.retriever import retrieve, format_context, format_sources
+from tasks.task3.retriever import retrieve, format_context, format_sources, MIN_SCORE
 
 
 def _extract_station(user_input: str) -> tuple[str | None, float]:
@@ -40,6 +40,21 @@ def answer_contingency_query(
     chunks = retrieve(user_input, top_k=5, station=station)
     timings["vector_db_retrieval"] = round(time.perf_counter() - t0, 2)
 
+    if not chunks:
+        no_doc_answer = (
+            "I don't have a disruption plan in the knowledge base that covers this situation. "
+            "Please escalate to the relevant control centre or duty manager for guidance."
+        )
+        if return_debug:
+            return no_doc_answer, {
+                "chunks_retrieved": 0,
+                "top_chunk_score": None,
+                "stations_found": [],
+                "timings_secs": timings,
+                "reason": f"no chunks above min_score={MIN_SCORE}",
+            }
+        return no_doc_answer
+
     context = format_context(chunks)
 
     system_prompt = (
@@ -66,8 +81,7 @@ def answer_contingency_query(
 
     timings["total"] = round(sum(timings.values()), 2)
 
-    if chunks:
-        answer += f"\n\n---\n**Sources:**\n{format_sources(chunks)}"
+    answer += f"\n\n---\n**Sources:**\n{format_sources(chunks)}"
 
     if return_debug:
         return answer, {

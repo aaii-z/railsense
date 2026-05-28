@@ -1,5 +1,6 @@
 import os
 import pickle
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -14,7 +15,6 @@ ROUTE_WEY2WAT = [
 ]
 ROUTE_WAT2WEY = list(reversed(ROUTE_WEY2WAT))
 
-# All unique route stations (same set, both directions)
 ROUTE = ROUTE_WEY2WAT
 
 TARGET_COL = "target_delay_at_destination"
@@ -22,7 +22,7 @@ FEATURE_COLS = [
     "station_encoded",
     "destination_encoded",
     "arrival_delay",
-    "departure_delay",       # was computed but never used before
+    "departure_delay",
     "planned_arr_mins",
     "day_of_week",
     "week_of_year",
@@ -39,17 +39,7 @@ def load_data(filepath: str) -> pd.DataFrame:
 
 
 def clean_data(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Remove rows that would corrupt training:
-
-    1. Cancelled trains — RIDs where every actual_arrival_time is NaN.
-       The train never ran; there is no delay signal to learn from.
-
-    2. Duplicate rid+location stops — happen when a timetable is revised
-       mid-operation and two schedule entries exist for the same stop.
-       Keep the row that has actual_arrival_time filled in; if both are
-       filled in (rare), keep the one with the earlier planned_arrival_time.
-    """
+    """Remove cancelled trains and duplicate rid+location stops."""
     before = len(df)
 
     # 1. Drop fully cancelled trains
@@ -60,7 +50,6 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     cancelled_rows = before - len(df)
 
     # 2. Resolve duplicate rid+location entries
-    # Sort so rows with actual_arrival_time come first, then by planned time
     df["_has_actual"] = df["actual_arrival_time"].notna().astype(int)
     df = (
         df.sort_values(
@@ -78,7 +67,7 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def parse_time_to_minutes(t) -> float:
-    """Convert HH:MM or HH:MM:SS string to integer minutes since midnight."""
+    """Convert HH:MM or HH:MM:SS string to minutes since midnight."""
     if pd.isna(t) or str(t).strip() == "":
         return np.nan
     try:
@@ -89,7 +78,7 @@ def parse_time_to_minutes(t) -> float:
 
 
 def fix_midnight_wraparound(delay: float) -> float:
-    """Trains crossing midnight produce ±1440-minute errors — undo them."""
+    """Trains crossing midnight produce ±1440-minute errors  undo them."""
     if pd.isna(delay):
         return delay
     if delay < -200:
@@ -145,13 +134,7 @@ def add_delay_reason_feature(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def create_journey_id(df: pd.DataFrame, direction: str) -> pd.DataFrame:
-    """
-    Build a stable journey ID for each train run.
-
-    For WEY2WAT anchor on the WEY departure time.
-    For WAT2WEY anchor on the WAT departure time.
-    This avoids the 'unknown' problem when the anchor station is the destination.
-    """
+    """Build a stable journey ID anchored on the origin departure time."""
     df = df.copy()
     origin_station = "WEY" if direction == "WEY2WAT" else "WAT"
 
@@ -222,13 +205,7 @@ def get_X_y(df: pd.DataFrame):
 
 
 def run_preprocessing(data_dir: str, save_dir: str = "../../models/task2", force: bool = False):
-    """
-    Process raw CSVs into features and save to disk.
-
-    On subsequent calls (e.g. running a second model), if processed_data.csv
-    and station_encoder.pkl already exist, skip all the heavy work and load
-    them directly. Pass force=True to reprocess from scratch.
-    """
+    """Process raw CSVs into features and save to disk. Caches results; use force=True to reprocess."""
     processed_csv  = os.path.join(save_dir, "processed_data.csv")
     encoder_pkl    = os.path.join(save_dir, "station_encoder.pkl")
 
@@ -283,7 +260,7 @@ def run_preprocessing(data_dir: str, save_dir: str = "../../models/task2", force
 
 
 if __name__ == "__main__":
-    DATA_DIR = str(__import__("pathlib").Path(__file__).resolve().parents[2] / "data" / "raw")
+    DATA_DIR = str(Path(__file__).resolve().parents[2] / "data" / "raw")
     X, y, encoder, df = run_preprocessing(DATA_DIR)
     print(f"\nX: {X.shape}, y: {y.shape}")
     print(df[FEATURE_COLS + [TARGET_COL]].head(10))

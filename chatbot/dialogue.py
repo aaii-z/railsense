@@ -8,10 +8,11 @@ import requests
 from zeep.exceptions import Error as ZeepError
 
 from llm.client import chat_text
+from tasks.task1.stations import STATION_LOOKUP
 from tasks.task1.ticket_finder import default_ticket_state, handle_ticket_message
 from tasks.task2.predictor import default_delay_state, handle_delay_message
 from tasks.task3.llm import answer_contingency_query
-from tasks.weather import get_weather, format_weather_markdown
+from tasks.weather import get_weather
 from db.conversations import save_turn, ensure_table
 
 log = logging.getLogger(__name__)
@@ -34,9 +35,6 @@ _DELAY_RE = re.compile(
     r"predict\s+arrival|arrival\s+time)\b",
     re.IGNORECASE,
 )
-# Matches messages that are *only* a greeting (with optional punctuation/informal
-# address word), not "hi, I want to book a ticket to London".
-# The optional non-capturing group allows "hey bruh", "hi mate", "hello there" etc.
 _GREETING_ONLY_RE = re.compile(
     r"^\s*(?:hi+|hai|hello+|hey+a?|heyo+|hiya|howdy|yo+|sup|greetings|"
     r"good\s+(?:morning|afternoon|evening|day)|what'?s\s+up)"
@@ -44,6 +42,27 @@ _GREETING_ONLY_RE = re.compile(
     r"[\s!.,?]*$",
     re.IGNORECASE,
 )
+
+_SOCIAL_RE = re.compile(
+    r"^\s*(?:thanks?(?:\s+(?:you|a\s+lot|so\s+much|very\s+much))?|"
+    r"thank\s+you(?:\s+(?:so\s+much|very\s+much))?|"
+    r"cheers?|ta|"
+    r"ok(?:ay)?|k|"
+    r"got\s+it|got\s+that|makes?\s+sense|"
+    r"great|perfect|cool|awesome|brilliant|fantastic|wonderful|excellent|"
+    r"sounds?\s+good|that'?s?\s+(?:great|helpful|perfect|good|useful|brilliant)|"
+    r"alright|alrighty|"
+    r"no\s+(?:worries|problem|prob)|np|nw|"
+    r"nice\s+one|good\s+(?:stuff|one)|"
+    r"sure|yep|yeah|yup|"
+    r"understood|noted|"
+    r"bye|goodbye|see\s+ya|take\s+care|cheers"
+    r")[\s!.,?]*$",
+    re.IGNORECASE,
+)
+
+_SOCIAL_REPLY = "You're welcome! Let me know if there's anything else I can help you with."
+_STAFF_SOCIAL_REPLY = "You're welcome! Let me know if you need help with anything else."
 
 
 GREETING = (
@@ -71,6 +90,30 @@ def init_dialogue_state() -> dict[str, Any]:
     }
 
 
+def _trim_history(state: dict[str, Any]) -> None:
+    """Keep only the 20 most recent history entries."""
+    if len(state["history"]) > 20:
+        state["history"] = state["history"][-20:]
+
+
+def _quick_reply(
+    state: dict[str, Any],
+    session_id: str | None,
+    user_input: str,
+    kind: str,
+    message: str,
+    intent: str,
+) -> dict[str, Any]:
+    """Record a simple (non-task) turn, persist it, and return a finished response."""
+    state["history"].append({"role": "user", "content": user_input})
+    state["history"].append({"role": "assistant", "content": message})
+    _trim_history(state)
+    if session_id:
+        save_turn(session_id, "user", user_input, intent)
+        save_turn(session_id, "assistant", message, intent)
+    return {"kind": kind, "done": True, "message": message}
+
+
 def _detect_intent(user_input: str, history: list, active_task: str | None = None) -> str:
     """Pick intent: keyword regex first, then LLM if unclear."""
     delay_match  = bool(_DELAY_RE.search(user_input))
@@ -88,9 +131,6 @@ def _detect_intent(user_input: str, history: list, active_task: str | None = Non
             return "delay_prediction"
         if active_task == "ticket_search" and ticket_match and not delay_match:
             return "ticket_search"
-        # One regex fires clearly and the other doesn't → unambiguous switch.
-        # Requiring the OTHER regex to be silent prevents "my ticket is delayed"
-        # (both match) from accidentally switching tasks.
         if delay_match and not ticket_match:
             return "delay_prediction"
         if ticket_match and not delay_match:
@@ -120,10 +160,6 @@ Reply with exactly one word only: ticket_search, delay_prediction, or contingenc
     except Exception:
         log.warning("intent classification LLM call failed", exc_info=True)
 
-    # LLM failed or returned something unrecognised.
-    # Mid-task: stay on the current task so the user doesn't lose progress.
-    # No active task: fall back to greeting so the user is reminded what the
-    # bot can do, rather than being routed into a task they never asked for.
     return active_task or "greeting"
 
 
@@ -164,33 +200,16 @@ _OUT_OF_SCOPE_MSG = (
 )
 
 
-_CRS_TO_CITY: dict[str, str] | None = None
-
-
-def _get_crs_to_city() -> dict[str, str]:
-    """Load a CRS code → city name mapping (for weather geocoding)."""
-    global _CRS_TO_CITY
-    if _CRS_TO_CITY is None:
-        import pandas as pd
-        from pathlib import Path
-        csv_path = Path(__file__).resolve().parents[1] / "data" / "station_cities.csv"
-        df = pd.read_csv(csv_path)
-        df.columns = df.columns.str.strip()
-        _CRS_TO_CITY = {
-            str(row["crsCode"]).strip().upper(): str(row["city"]).strip()
-            for _, row in df.iterrows()
-            if str(row.get("city", "")).strip()
-        }
-    return _CRS_TO_CITY
+def _crs_to_city(crs: str) -> str | None:
+    """Map a CRS code to its city/station name via the already-loaded STATION_LOOKUP."""
+    crs_upper = crs.strip().upper()
+    for name, codes in STATION_LOOKUP.items():
+        if crs_upper in codes:
+            return name.title()
+    return None
 
 
 def _weather_location(response: dict[str, Any], state: dict[str, Any]) -> str | None:
-    """Determine the best location string for weather lookup.
-
-    The raw state destination might be a misspelling (e.g. 'lonodn') which
-    the geocoder can't resolve. Fall back to the city name for the resolved
-    destination CRS code from the journeys in the response.
-    """
     kind = response.get("kind")
 
     if kind == "ticket_search":
@@ -198,7 +217,7 @@ def _weather_location(response: dict[str, Any], state: dict[str, Any]) -> str | 
         if journeys:
             dest = journeys[0].get("destination", "")
             if len(dest) == 3 and dest.isupper():
-                city = _get_crs_to_city().get(dest)
+                city = _crs_to_city(dest)
                 if city:
                     return city
             return dest
@@ -252,8 +271,6 @@ def _attach_weather(response: dict[str, Any], state: dict[str, Any]) -> None:
         return
 
     if weather:
-        weather_md = format_weather_markdown(weather)
-        response["message"] += f"\n\n---\n{weather_md}"
         response["weather"] = {
             "location": weather.location,
             "temperature_c": weather.temperature_c,
@@ -270,68 +287,39 @@ def handle_message(
     is_staff: bool = False,
     session_id: str | None = None,
 ) -> dict[str, Any]:
-    # Greet back when the user only says "hi" / "hello" etc. so we don't jump
-    # straight into slot-filling like "origin and destination?". Don't gate on
-    # active_task: a misclassified earlier turn could trap them in slot-fill
-    # forever. The task state is preserved, so their next real message resumes.
     if _GREETING_ONLY_RE.match(user_input):
         greeting = STAFF_GREETING if is_staff else GREETING
-        state["history"].append({"role": "user", "content": user_input})
-        state["history"].append({"role": "assistant", "content": greeting})
-        if len(state["history"]) > 20:
-            state["history"] = state["history"][-20:]
-        if session_id:
-            try:
-                save_turn(session_id, "user", user_input, "greeting")
-                save_turn(session_id, "assistant", greeting, "greeting")
-            except Exception:
-                pass
-        return {"kind": "greeting", "done": True, "message": greeting}
+        return _quick_reply(state, session_id, user_input, "greeting", greeting, "greeting")
+
+    if _SOCIAL_RE.match(user_input):
+        reply = _STAFF_SOCIAL_REPLY if is_staff else _SOCIAL_REPLY
+        return _quick_reply(state, session_id, user_input, "social", reply, "social")
 
     intent = _detect_intent(user_input, state["history"], state.get("active_task"))
 
-    # LLM couldn't map the message to a task — remind the user what's available.
     if intent == "greeting":
         greeting = STAFF_GREETING if is_staff else GREETING
-        state["history"].append({"role": "user",      "content": user_input})
-        state["history"].append({"role": "assistant",  "content": greeting})
-        if len(state["history"]) > 20:
-            state["history"] = state["history"][-20:]
-        if session_id:
-            try:
-                save_turn(session_id, "user",      user_input, "greeting")
-                save_turn(session_id, "assistant", greeting,   "greeting")
-            except Exception:
-                pass
-        return {"kind": "greeting", "done": True, "message": greeting}
+        return _quick_reply(state, session_id, user_input, "greeting", greeting, "greeting")
 
     if is_staff and intent != "contingency":
-        out_of_scope = (
+        msg = (
             "As a staff member I can only assist with station contingency plans and "
             "operational disruption guidance. Please ask about a station's emergency "
             "procedures, disruption handling, or escalation protocols."
         )
-        state["history"].append({"role": "user", "content": user_input})
-        state["history"].append({"role": "assistant", "content": out_of_scope})
-        if len(state["history"]) > 20:
-            state["history"] = state["history"][-20:]
-        return {"kind": "out_of_scope", "done": True, "message": out_of_scope}
+        return _quick_reply(state, session_id, user_input, "out_of_scope", msg, intent)
 
     if not is_staff and intent not in {"ticket_search", "delay_prediction"}:
-        state["history"].append({"role": "user", "content": user_input})
-        state["history"].append({"role": "assistant", "content": _OUT_OF_SCOPE_MSG})
-        if len(state["history"]) > 20:
-            state["history"] = state["history"][-20:]
-        return {"kind": "out_of_scope", "done": True, "message": _OUT_OF_SCOPE_MSG}
+        return _quick_reply(state, session_id, user_input, "out_of_scope", _OUT_OF_SCOPE_MSG, intent)
 
     debug_mode = os.environ.get("RAILSENSE_DEBUG", "").lower() in {"1", "true", "yes"}
     started_at = datetime.now(timezone.utc).isoformat()
-    _ticket_state_snapshot: dict = {}
+    ticket_state_snapshot: dict = {}
 
     try:
         if intent == "ticket_search":
             state["active_task"] = "ticket_search"
-            _ticket_state_snapshot = dict(state["ticket_state"])
+            ticket_state_snapshot = dict(state["ticket_state"])
             response = handle_ticket_message(user_input, state["ticket_state"], debug=debug_mode)
 
         elif intent == "delay_prediction":
@@ -376,13 +364,12 @@ def handle_message(
 
     if debug_mode:
         response["debug"] = _build_debug_block(
-            intent, state, response, user_input, started_at, _ticket_state_snapshot
+            intent, state, response, user_input, started_at, ticket_state_snapshot
         )
 
     state["history"].append({"role": "user", "content": user_input})
     state["history"].append({"role": "assistant", "content": response["message"]})
-    if len(state["history"]) > 20:
-        state["history"] = state["history"][-20:]
+    _trim_history(state)
 
     if session_id:
         assistant_extras = {

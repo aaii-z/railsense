@@ -1,17 +1,9 @@
-"""
-DB-backed staff authentication with PBKDF2-hashed passwords.
-
-Passwords are stored as 'salt_hex:hash_hex' using PBKDF2-HMAC-SHA256
-with 100 000 iterations. The default staff user is seeded automatically
-when the table is empty.
-"""
-
 import hashlib
 import logging
 import os
 import secrets
 
-from db import get_conn, put_conn
+from db import db_cursor
 
 log = logging.getLogger(__name__)
 
@@ -32,20 +24,12 @@ def _verify_password(password: str, stored: str) -> bool:
 
 
 def authenticate(username: str, password: str) -> bool:
-    conn = get_conn()
-    try:
-        cur = conn.cursor()
-        try:
-            cur.execute(
-                "SELECT password_hash FROM staff_users WHERE username = %s",
-                (username,),
-            )
-            row = cur.fetchone()
-        finally:
-            cur.close()
-    finally:
-        put_conn(conn)
-
+    with db_cursor() as cur:
+        cur.execute(
+            "SELECT password_hash FROM staff_users WHERE username = %s",
+            (username,),
+        )
+        row = cur.fetchone()
     if not row:
         return False
     return _verify_password(password, row[0])
@@ -53,22 +37,14 @@ def authenticate(username: str, password: str) -> bool:
 
 def ensure_default_user() -> None:
     """Seed the default staff user if the table is empty."""
-    conn = get_conn()
-    try:
-        cur = conn.cursor()
-        try:
-            cur.execute("SELECT 1 FROM staff_users LIMIT 1")
-            if cur.fetchone() is not None:
-                return
-            username = os.environ.get("STAFF_USERNAME", "staff")
-            password = os.environ.get("STAFF_PASSWORD", "railsense123")
-            cur.execute(
-                "INSERT INTO staff_users (username, password_hash) VALUES (%s, %s)",
-                (username, _hash_password(password)),
-            )
-            conn.commit()
-            log.info("Seeded default staff user '%s'", username)
-        finally:
-            cur.close()
-    finally:
-        put_conn(conn)
+    with db_cursor(commit=True) as cur:
+        cur.execute("SELECT 1 FROM staff_users LIMIT 1")
+        if cur.fetchone() is not None:
+            return
+        username = os.environ.get("STAFF_USERNAME", "staff")
+        password = os.environ.get("STAFF_PASSWORD", "railsense123")
+        cur.execute(
+            "INSERT INTO staff_users (username, password_hash) VALUES (%s, %s)",
+            (username, _hash_password(password)),
+        )
+    log.info("Seeded default staff user '%s'", username)

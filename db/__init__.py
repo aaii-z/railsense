@@ -1,5 +1,6 @@
 import os
 import threading
+from contextlib import contextmanager
 
 import psycopg2
 import psycopg2.pool
@@ -36,3 +37,21 @@ def get_conn():
 
 def put_conn(conn) -> None:
     _get_pool().putconn(conn)
+
+
+@contextmanager
+def db_cursor(*, commit: bool = False):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        try:
+            yield cur
+            if commit:
+                conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            cur.close()
+    finally:
+        put_conn(conn)

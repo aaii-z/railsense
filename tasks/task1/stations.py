@@ -73,24 +73,13 @@ def _load_station_lookup(
     df.columns = df.columns.str.strip()
     lookup: dict[str, list[str]] = {}
 
-    # Pass 1 — station names: exact name matches must come first so that
-    # "luton" → LUT (Luton) before LTN (Luton Airport Parkway) even though
-    # Luton Airport Parkway's city is also "Luton".
     for _, row in df.iterrows():
-        name = str(row["stationName"]).strip().lower()
-        crs  = str(row["crsCode"]).strip().upper()
-        lookup.setdefault(name, [])
-        if crs not in lookup[name]:
-            lookup[name].append(crs)
-
-    # Pass 2 — cities: append only if not already present (satellite stations
-    # share a city with the main terminus but shouldn't displace it).
-    for _, row in df.iterrows():
-        city = str(row["city"]).strip().lower()
-        crs  = str(row["crsCode"]).strip().upper()
-        lookup.setdefault(city, [])
-        if crs not in lookup[city]:
-            lookup[city].append(crs)
+        crs = str(row["crsCode"]).strip().upper()
+        for key in (str(row["stationName"]).strip().lower(), str(row["city"]).strip().lower()):
+            if key:
+                lookup.setdefault(key, [])
+                if crs not in lookup[key]:
+                    lookup[key].append(crs)
 
     return lookup
 
@@ -119,24 +108,23 @@ def resolve_station(user_input: str) -> list[str]:
         return STATION_LOOKUP[query][:MAX_STATIONS]
 
     matches = process.extract(query, STATION_LOOKUP.keys(), limit=3)
-    # Drop matches where the query is more than 2x longer than the station name —
-    # these are substring-inflation false positives (e.g. "zzzznotastation" → "aston").
+    # Drop matches where query is far shorter than the station name (e.g. "lo" → "london")
     matches = [(n, s, i) for n, s, i in matches if len(query) <= len(n) * 2]
-    if not matches or matches[0][1] < 70:
+    if not matches or matches[0][1] < 70:  # below 70: no confident match at all
         return []
 
     top_name, top_score, _ = matches[0]
 
-    # Typos like 'londn' shouldn't trigger a confirmation prompt for big cities.
+    # Well-known cities: accept score >= 80 to avoid confirmation prompts on obvious typos
+    # e.g. "londn" → "london" should just resolve, not ask "did you mean London?"
     if top_name in _CITY_PRIORITY and top_score >= 80:
         return _CITY_PRIORITY[top_name][:MAX_STATIONS]
 
-    # Only auto-accept if the query is at least 60% as long as the matched name.
-    # Prevents short prefixes like "sout" from being accepted as "ardrossan south beach".
+    # Score >= 90 and query is at least 60% as long as the match: confident single result
     if top_score >= 90 and len(query) >= len(top_name) * 0.6:
         return STATION_LOOKUP[top_name][:1]
 
-    # 70-89: ambiguous — show top match plus anything within 10 points.
+    # 70–89: ambiguous — return top match plus anything within 10 points for user to choose
     candidates = [matches[0][0].title()]
     for name, score, _ in matches[1:]:
         if score >= top_score - 10 and name.title() not in candidates:

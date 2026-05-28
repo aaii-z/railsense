@@ -1,0 +1,152 @@
+(venv) ➜  task2 git:(progress-demo) ✗ python model_comparison.py
+[00:00] --- Preprocessing ---
+Loading cached processed data from /home/aaii/Projects/railsense/models/task2/
+  Loaded: 3,602,355 rows, 49,971 journeys
+  3,602,355 rows | 49,971 journeys
+
+--- Train / Validation / Test Split (70 / 15 / 15) ---
+  Train: 2,524,931  |  Val: 536,818  |  Test: 540,606
+
+[00:20] --- Baseline Models (1/5) ---
+  [00:20] [1/7] Ridge... MAE=3.108  RMSE=5.897  R²=0.6702  (2s)
+  [00:21] [2/7] Random Forest... MAE=2.969  RMSE=5.721  R²=0.6896  (324s)
+  [05:46] [3/7] Gradient Boosting... MAE=2.966  RMSE=5.707  R²=0.6911  (458s)
+  [13:24] [4/7] XGBoost... MAE=2.913  RMSE=5.637  R²=0.6986  (12s)
+  [13:35] [5/7] LightGBM... /home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+MAE=2.926  RMSE=5.655  R²=0.6967  (7s)
+  [13:43] [6/7] KNN... MAE=3.039  RMSE=5.909  R²=0.6688  (167s)
+  [16:29] [7/7] MLP... /home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/neural_network/_multilayer_perceptron.py:785: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (100) reached and the optimization hasn't converged yet.
+  warnings.warn(
+MAE=2.935  RMSE=5.712  R²=0.6905  (1786s)
+
+[46:15] --- Hyperparameter Tuning (2/5) ---
+
+  [46:15] [1/7] Tuning Ridge (6 iters × 3-fold CV)...
+    Best params: {'model__alpha': 0.001}  (26s)
+    MAE=3.108  RMSE=5.897  R²=0.6702  (ΔMAE=-0.000)
+    Saved → /home/aaii/Projects/railsense/models/task2/ridge.pkl
+
+  [46:41] [2/7] Tuning Random Forest (6 iters × 3-fold CV)...
+    Best params: {'n_estimators': 100, 'max_features': 0.5, 'max_depth': 20}  (2564s)
+    MAE=2.843  RMSE=5.608  R²=0.7017  (ΔMAE=+0.127)
+    Saved → /home/aaii/Projects/railsense/models/task2/random_forest.pkl
+
+  [89:36] [3/7] Tuning Gradient Boosting (6 iters × 3-fold CV)...
+    Best params: {'n_estimators': 100, 'max_depth': 5, 'learning_rate': 0.1}  (3929s)
+    MAE=2.893  RMSE=5.607  R²=0.7019  (ΔMAE=+0.073)
+    Saved → /home/aaii/Projects/railsense/models/task2/gradient_boosting.pkl
+
+  [155:06] [4/7] Tuning XGBoost (6 iters × 3-fold CV)...
+    Best params: {'subsample': 0.8, 'max_depth': 8, 'learning_rate': 0.1}  (152s)
+    MAE=2.820  RMSE=5.499  R²=0.7132  (ΔMAE=+0.093)
+    Saved → /home/aaii/Projects/railsense/models/task2/xgboost.pkl
+
+  [157:39] [5/7] Tuning LightGBM (6 iters × 3-fold CV)...
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+    Best params: {'subsample': 0.8, 'num_leaves': 127, 'learning_rate': 0.1}  (139s)
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+    MAE=2.817  RMSE=5.488  R²=0.7143  (ΔMAE=+0.109)
+    Saved → /home/aaii/Projects/railsense/models/task2/lightgbm.pkl
+
+  [160:01] [6/7] Tuning KNN (6 iters × 3-fold CV)...
+    Best params: {'model__weights': 'distance', 'model__n_neighbors': 50, 'model__metric': 'manhattan'}  (3673s)
+    MAE=2.949  RMSE=5.835  R²=0.6771  (ΔMAE=+0.090)
+    Saved → /home/aaii/Projects/railsense/models/task2/knn.pkl
+
+  [231:01] [7/7] Tuning MLP (4 iters × 3-fold CV)...
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/neural_network/_multilayer_perceptron.py:785: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (100) reached and the optimization hasn't converged yet.
+  warnings.warn(
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/neural_network/_multilayer_perceptron.py:785: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (100) reached and the optimization hasn't converged yet.
+  warnings.warn(
+    Best params: {'model__learning_rate_init': 0.001, 'model__hidden_layer_sizes': (64,)}  (7155s)
+    MAE=2.955  RMSE=5.679  R²=0.6941  (ΔMAE=-0.020)
+    Saved → /home/aaii/Projects/railsense/models/task2/mlp.pkl
+
+  Best params saved to /home/aaii/Projects/railsense/models/task2/best_params.json
+
+  ✓ Best single model : LightGBM
+    MAE=2.817  R²=0.7143
+    Saved as best_lightgbm.pkl → /home/aaii/Projects/railsense/models/task2/best_lightgbm.pkl
+
+[350:17] --- Weighted Ensemble (3/5) ---
+  Ridge                val R²=0.6383
+  Random Forest        val R²=0.6660
+  Gradient Boosting    val R²=0.6684
+  XGBoost              val R²=0.6790
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+  LightGBM             val R²=0.6783
+  KNN                  val R²=0.6434
+  MLP                  val R²=0.6613
+/home/aaii/Projects/railsense/venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+
+  Weighted Ensemble  MAE=2.822  RMSE=5.537  R²=0.7092
+  Within 2/5/10 min: 59.0% / 86.8% / 95.6%
+  Weights: {'Ridge': '0.138', 'Random Forest': '0.144', 'Gradient Boosting': '0.144', 'XGBoost': '0.147', 'LightGBM': '0.146', 'KNN': '0.139', 'MLP': '0.143'}
+  Saved → /home/aaii/Projects/railsense/models/task2/weighted_ensemble.pkl
+
+[370:29] --- Plots (4/5) ---
+  saved 07_tuning_before_after.png
+  saved 08_tuning_r2.png
+  saved 09_mae_improvement.png
+  saved 10_tuned_within_n.png
+  saved 11_tuned_actual_vs_predicted.png
+  saved 12_tuned_heatmap.png
+
+[370:32] --- Summary (5/5) ---
+======================================================================
+Model                   Base MAE  Tuned MAE     ΔMAE   Tuned R²
+----------------------------------------------------------------------
+Ridge                      3.108      3.108   +0.000     0.6702
+Random Forest              2.969      2.843   -0.127     0.7017
+Gradient Boosting          2.966      2.893   -0.073     0.7019
+XGBoost                    2.913      2.820   -0.093     0.7132
+LightGBM                   2.926      2.817   -0.109     0.7143
+KNN                        3.039      2.949   -0.090     0.6771
+MLP                        2.935      2.955   +0.020     0.6941
+----------------------------------------------------------------------
+Weighted Ensemble                     2.822              0.7092
+======================================================================
+
+All plots saved to: /home/aaii/Projects/railsense/models/task2/plots
+
+Done in 370m 32s.
+

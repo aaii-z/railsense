@@ -38,10 +38,10 @@ def _db_available() -> bool:
 # ── Station resolver benchmarks ───────────────────────────────────────────────
 
 class TestStationResolver:
-    """Benchmarks for tasks/task1/stations.py — resolve_station()."""
+    """Benchmarks for tasks/task1/stations.py  resolve_station()."""
 
     def test_exact_city_match(self, benchmark):
-        """Fast path: city is in _CITY_PRIORITY dict — O(1) lookup."""
+        """Fast path: city is in _CITY_PRIORITY dict  O(1) lookup."""
         from tasks.task1.stations import resolve_station
         result = benchmark(resolve_station, "manchester")
         assert result  # must return at least one CRS code
@@ -61,17 +61,17 @@ class TestStationResolver:
             except StationAmbiguous:
                 return []   # ambiguous is still a valid (non-crash) outcome
         result = benchmark(_call)
-        # result can be [] or a list — just confirm no exception leaks
+        # result can be [] or a list  just confirm no exception leaks
         assert result is not None
 
     def test_unknown_station(self, benchmark):
-        """Worst case: no match found — rapidfuzz exhausts all candidates."""
+        """Worst case: no match found  rapidfuzz exhausts all candidates."""
         from tasks.task1.stations import resolve_station
         result = benchmark(resolve_station, "zzz_not_a_real_station_xyz")
         assert result == []
 
     def test_london_terminal_for(self, benchmark):
-        """O(1) dict lookup — should be nanoseconds."""
+        """O(1) dict lookup  should be nanoseconds."""
         from tasks.task1.stations import london_terminal_for
         result = benchmark(london_terminal_for, "MAN")
         assert result == "EUS"
@@ -81,14 +81,10 @@ class TestStationResolver:
 
 @pytest.mark.skipif(not _model_available(), reason="random_forest.pkl not trained yet")
 class TestDelayPredictor:
-    """Benchmarks for tasks/task2/predictor.py — predict_delay_minutes().
-
-    Skipped automatically when the model file does not exist.
-    Train with: python -m tasks.task2.randomforest_model
-    """
+    """Benchmarks for tasks/task2/predictor.py  predict_delay_minutes()."""
 
     def test_single_prediction(self, benchmark):
-        """Single ML inference call — the main production hot path."""
+        """Single ML inference call  the main production hot path."""
         from tasks.task2.predictor import predict_delay_minutes
         result = benchmark(
             predict_delay_minutes,
@@ -125,7 +121,7 @@ class TestDelayPredictor:
         assert isinstance(result, float)
 
     def test_batch_100_predictions(self, benchmark):
-        """100 sequential predictions — simulates a burst of user requests."""
+        """100 sequential predictions  simulates a burst of user requests."""
         from tasks.task2.predictor import predict_delay_minutes
 
         stations = [
@@ -174,14 +170,10 @@ class TestRouteHelpers:
 # ── Task 3: RAG / contingency benchmarks ─────────────────────────────────────
 
 class TestTask3RAG:
-    """Benchmarks for tasks/task3/ — embedding generation and retrieval.
-
-    Embedding tests run without any external services.
-    DB retrieval tests are skipped when PostgreSQL is not reachable.
-    """
+    """Benchmarks for tasks/task3/  embedding generation and retrieval."""
 
     def test_embed_short_query(self, benchmark):
-        """Encode a short staff question — the hot path on every RAG call."""
+        """Encode a short staff question  the hot path on every RAG call."""
         from tasks.task3.retriever import _get_embedder
         embedder = _get_embedder()   # warm up model before timing starts
         result = benchmark(embedder.encode, "What is the evacuation procedure?")
@@ -201,7 +193,7 @@ class TestTask3RAG:
         assert result.shape[0] == 384
 
     def test_embed_batch_10(self, benchmark):
-        """Encode 10 queries at once — tests batch throughput."""
+        """Encode 10 queries at once  tests batch throughput."""
         from tasks.task3.retriever import _get_embedder
         embedder = _get_embedder()
         queries = [
@@ -220,7 +212,7 @@ class TestTask3RAG:
         assert result.shape == (10, 384)
 
     def test_format_context(self, benchmark):
-        """Format retrieved chunks into a prompt context string — pure Python."""
+        """Format retrieved chunks into a prompt context string  pure Python."""
         from tasks.task3.retriever import format_context
         chunks = [
             {"station": "Waterloo", "section": "Evacuation",
@@ -234,7 +226,7 @@ class TestTask3RAG:
         assert "Waterloo" in result
 
     def test_format_sources(self, benchmark):
-        """Deduplicate and format source citations — pure Python."""
+        """Deduplicate and format source citations  pure Python."""
         from tasks.task3.retriever import format_sources
         chunks = [
             {"station": "Waterloo", "region": "London", "doc_date": "2024-01-15",
@@ -251,7 +243,7 @@ class TestTask3RAG:
 
     @pytest.mark.skipif(not _db_available(), reason="PostgreSQL/pgvector not reachable")
     def test_vector_db_retrieval(self, benchmark):
-        """Full pgvector similarity search — requires live DB with ingested docs."""
+        """Full pgvector similarity search  requires live DB with ingested docs."""
         from tasks.task3.retriever import retrieve
         results = benchmark(retrieve, "evacuation procedure", top_k=5)
         assert isinstance(results, list)
@@ -267,14 +259,10 @@ class TestTask3RAG:
 # ── Task 1: Ticket pipeline benchmarks ───────────────────────────────────────
 
 class TestTask1TicketPipeline:
-    """Benchmarks for the pure-computation parts of tasks/task1/ticket_finder.py.
-
-    Skips anything that touches the SOAP API or the LLM — those are external
-    services and their latency swamps any code-level measurement.
-    """
+    """Benchmarks for the pure-computation parts of tasks/task1/ticket_finder.py."""
 
     def test_booking_link_builder(self, benchmark):
-        """Build a National Rail booking URL — pure string formatting."""
+        """Build a National Rail booking URL  pure string formatting."""
         from datetime import datetime
         from zoneinfo import ZoneInfo
         from tasks.task1.ticket_finder import _booking_link
@@ -305,7 +293,7 @@ class TestTask1TicketPipeline:
         assert assumed is True
 
     def test_min_fare_pence(self, benchmark):
-        """Extract cheapest fare from a journey dict — pure dict traversal."""
+        """Extract cheapest fare from a journey dict  pure dict traversal."""
         from tasks.task1.ticket_finder import _min_fare_pence
         journey = {
             "fare": [

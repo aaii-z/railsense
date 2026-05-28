@@ -1,30 +1,11 @@
 """
 Locust load test for RailSense core functions.
 
-Tests the dialogue engine and ML prediction directly (no HTTP/Streamlit needed).
-Each simulated "user" calls the same Python functions your Streamlit app calls.
-
-Usage
------
-Install:
-    pip install locust
-
 Run (headless, 20 users, 60 seconds):
     locust -f tests/load/locustfile.py --headless -u 20 -r 2 -t 60s --no-web
 
-Run (with browser dashboard at http://localhost:8089):
+Run (with browser dashboard):
     locust -f tests/load/locustfile.py
-
-Then open http://localhost:8089, set:
-    Number of users : 20
-    Spawn rate      : 2  (users added per second)
-    Host            : (leave blank — not used for direct function calls)
-
-What gets measured
-------------------
-- resolve_station       : fuzzy station matching
-- predict_delay_minutes : ML inference (requires trained random_forest.pkl)
-- station_roundtrip     : both operations back-to-back (realistic user flow)
 """
 
 import sys
@@ -117,26 +98,18 @@ def _timed(env, name: str, func, *args, **kwargs):
 # ── User class ────────────────────────────────────────────────────────────────
 
 class RailSenseUser(User):
-    """
-    Simulates a single concurrent user of RailSense.
+    """Simulates a single concurrent RailSense user."""
 
-    Each task represents a type of interaction.  The numbers in @task(N)
-    control relative frequency — higher N = called more often.
-    """
-
-    # seconds to wait between tasks (realistic human think-time)
     wait_time = between(0.5, 2.0)
 
     def on_start(self):
-        """Called once when this simulated user starts."""
-        from tasks.task1.stations import resolve_station  # warm up lookup table
+        from tasks.task1.stations import resolve_station
         resolve_station("london")
 
         if _MODEL_AVAILABLE:
             from tasks.task2.predictor import _load_assets
-            _load_assets()  # warm up model cache
+            _load_assets()
 
-        # warm up sentence-transformers model (download once, then cached)
         from tasks.task3.retriever import _get_embedder
         _get_embedder()
 
@@ -144,14 +117,14 @@ class RailSenseUser(User):
 
     @task(4)
     def task_resolve_station_exact(self):
-        """Exact city name lookup — fast path."""
+        """Exact city name lookup  fast path."""
         from tasks.task1.stations import resolve_station
         query = random.choice(["london", "manchester", "birmingham", "edinburgh"])
         _timed(self.environment, "resolve_station/exact", resolve_station, query)
 
     @task(2)
     def task_resolve_station_fuzzy(self):
-        """Fuzzy/misspelled station lookup — slow path (rapidfuzz scan)."""
+        """Fuzzy/misspelled station lookup  slow path (rapidfuzz scan)."""
         from tasks.task1.stations import resolve_station, StationAmbiguous
         query = random.choice(["manchestr", "londn watarloo", "birminghm"])
 
@@ -167,7 +140,7 @@ class RailSenseUser(User):
 
     @task(3)
     def task_predict_delay(self):
-        """Single ML inference call — the core delay prediction hot path."""
+        """Single ML inference call  the core delay prediction hot path."""
         if not _MODEL_AVAILABLE:
             return  # skip silently if model not yet trained
 
@@ -184,7 +157,7 @@ class RailSenseUser(User):
 
     @task(3)
     def task_embed_query(self):
-        """Encode a staff contingency query — most expensive pure-compute step in Task 3."""
+        """Encode a staff contingency query  most expensive pure-compute step in Task 3."""
         from tasks.task3.retriever import _get_embedder
         query = random.choice(_CONTINGENCY_QUERIES)
         _timed(
@@ -196,7 +169,7 @@ class RailSenseUser(User):
 
     @task(1)
     def task_vector_db_retrieve(self):
-        """pgvector similarity search — skipped when DB is not reachable."""
+        """pgvector similarity search  skipped when DB is not reachable."""
         if not _DB_AVAILABLE:
             return
         from tasks.task3.retriever import retrieve
@@ -213,7 +186,7 @@ class RailSenseUser(User):
 
     @task(2)
     def task_booking_link(self):
-        """Build a National Rail booking URL — pure string formatting."""
+        """Build a National Rail booking URL  pure string formatting."""
         from datetime import datetime
         from zoneinfo import ZoneInfo
         from tasks.task1.ticket_finder import _booking_link
@@ -259,7 +232,7 @@ class RailSenseUser(User):
         from tasks.task1.stations import resolve_station, StationAmbiguous
         from tasks.task2.predictor import predict_delay_minutes
 
-        # Step 1 — station resolution
+        # Step 1  station resolution
         try:
             codes = _timed(
                 self.environment,
@@ -273,7 +246,7 @@ class RailSenseUser(User):
         if not codes:
             codes = ["SOU"]
 
-        # Step 2 — prediction using resolved code
+        # Step 2  prediction using resolved code
         station_code = codes[0] if codes else "SOU"
         _timed(
             self.environment,

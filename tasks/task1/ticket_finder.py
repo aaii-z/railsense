@@ -59,7 +59,7 @@ def _extract_ticket_fields(user_input: str, state: dict[str, Any]) -> dict[str, 
         "Treat 'morning' as 09:00, 'afternoon' as 14:00, 'evening' as 18:00 when no specific time is given.\n"
         "FOLLOW-UP RULES (current state may already have values from a previous search):\n"
         "- If origin and/or destination are already in current state and the user does NOT mention new ones, keep them as-is (output null so _update_state leaves them untouched).\n"
-        "- If the user says 'return', 'come back', 'going back', 'on the way back', or similar WITHOUT giving a new origin/destination, they want to add a return leg to the SAME journey — set return_time only, leave origin/destination null.\n"
+        "- If the user says 'return', 'come back', 'going back', 'on the way back', or similar WITHOUT giving a new origin/destination, they want to add a return leg to the SAME journey  set return_time only, leave origin/destination null.\n"
         "- If the user gives a completely new origin or destination, override that field.\n"
         "If origin, destination, or departure_time is genuinely absent from the message AND not already in current state, "
         "put one short follow-up question in next_question; otherwise next_question must be null.\n\n"
@@ -80,11 +80,15 @@ def _extract_ticket_fields(user_input: str, state: dict[str, Any]) -> dict[str, 
     )
 
 
+def _is_valid_value(v) -> bool:
+    """True if v is a real extracted value (not None / 'null' / empty)."""
+    return bool(v) and str(v).lower() not in ("none", "null", "")
+
+
 def _update_state(state: dict[str, Any], extracted: dict[str, Any]) -> None:
     for key in ("origin", "destination", "departure_time", "return_time"):
-        value = extracted.get(key)
-        if value and str(value).lower() not in ("none", "null", ""):
-            state[key] = value
+        if _is_valid_value(extracted.get(key)):
+            state[key] = extracted[key]
 
 
 def _is_complete(state: dict[str, Any]) -> bool:
@@ -114,16 +118,7 @@ def _parse_time(time_str: str | None) -> tuple[datetime | None, bool]:
 
 
 def _booking_link(origin: str, destination: str, depart_by: datetime) -> str:
-    """Build a National Rail journey planner URL for a single ticket.
-
-    Always uses type=single — two singles are compared/shown separately rather
-    than bundled into one return, which is typically cheaper.
-
-    Quirks found by testing:
-      - leavingDate must be DDMMYY (6 digits), not DDMMYYYY.
-      - leavingMin must be 00/15/30/45 or the page comes back empty.
-        Round down so the requested train still shows up.
-    """
+    """Build a National Rail journey planner URL."""
     rounded_min = (depart_by.minute // 15) * 15
     return (
         "https://www.nationalrail.co.uk/journey-planner/?"
@@ -140,9 +135,7 @@ def _booking_link(origin: str, destination: str, depart_by: datetime) -> str:
 
 
 def _fetch_plan(origin: str, destination: str, depart_by: datetime, inward_time: datetime | None) -> dict:
-    """Call RTJP. Retries when OJP sends back HTML instead of SOAP (happens
-    sometimes, probably rate limit / load balancer). Retrying usually works.
-    """
+    """Call RTJP with retry on transient HTML-instead-of-SOAP errors."""
     import time as _time
     client = create_client()
     kwargs = {
@@ -239,25 +232,17 @@ def _format_journey(journey: dict, depart_by: datetime) -> dict:
         "arrival":     _format_time(arr),
         "price":       f"£{pence / 100:.2f}" if pence else "-",
         "link":        _booking_link(booking_origin, booking_dest, link_time),
-        "pence":       pence or float("inf"),
-        "dep_dt":      link_time,
+        "pence":       pence or float("inf"),  # internal: used for sorting; stripped from final response
+        "dep_dt":      link_time,              # internal: used for time-window filter; stripped from final response
     }
 
 
 
 def _pick_top5(journeys: list[dict], depart_by: datetime) -> list[dict]:
-    """Filter to ±3 h window, sort by price, take top 5, assign shared booking links."""
+    """Filter to ±3 h window, sort by price, take top 5."""
     window = timedelta(hours=3)
     in_window = [j for j in journeys if abs((j["dep_dt"] - depart_by).total_seconds()) <= window.total_seconds()]
-    top5 = sorted(in_window or journeys, key=lambda j: j["pence"])[:5]
-    groups: dict[tuple[str, str], list[dict]] = {}
-    for j in top5:
-        groups.setdefault((j["origin"], j["destination"]), []).append(j)
-    for (orig, dest), group in groups.items():
-        shared_link = _booking_link(orig, dest, min(group, key=lambda j: j["pence"])["dep_dt"])
-        for j in group:
-            j["link"] = shared_link
-    return top5
+    return sorted(in_window or journeys, key=lambda j: j["pence"])[:5]
 
 
 def _search_all_pairs(
@@ -289,40 +274,37 @@ def _collect_slots(user_input: str, state: dict[str, Any], debug: bool) -> dict[
     """Extract fields from the user message. Returns a follow-up response if slots are still
     missing, or None when all required slots are filled and search can proceed."""
 
-    # Snapshot completeness BEFORE extraction so we can detect if this message
-    # actually added anything new, or whether the user is just reacting to results.
     was_complete = _is_complete(state)
-
     extracted = _extract_ticket_fields(user_input, state)
     _update_state(state, extracted)
 
-    if _is_complete(state):
-        # If the state was already complete and the LLM extracted no new field
-        # values, the user is commenting on the results (e.g. "it's expensive"),
-        # not requesting a fresh search. Acknowledge and offer to refine.
-        no_new_fields = not any(
-            extracted.get(k) and str(extracted.get(k, "")).lower() not in ("none", "null", "")
-            for k in ("origin", "destination", "departure_time", "return_time")
-        )
-        if was_complete and no_new_fields:
-            resp: dict[str, Any] = {
-                "kind": "ticket_search",
-                "done": False,
-                "message": (
-                    "Those are the best fares available for that journey. "
-                    "Would you like to try a different departure time, date, or route?"
-                ),
-            }
-            if debug:
-                resp["ticket_debug"] = {"step": "comment_on_results", "state": dict(state)}
-            return resp
-        return None
+    # Still missing required fields — ask a follow-up question
+    if not _is_complete(state):
+        question = extracted.get("next_question") or "Please tell me your origin, destination, and departure time."
+        resp: dict[str, Any] = {"kind": "ticket_search", "done": False, "message": question}
+        if debug:
+            resp["ticket_debug"] = {"step": "collecting_fields", "state": dict(state)}
+        return resp
 
-    question = extracted.get("next_question") or "Please tell me your origin, destination, and departure time."
-    resp = {"kind": "ticket_search", "done": False, "message": question}
-    if debug:
-        resp["ticket_debug"] = {"step": "collecting_fields", "state": dict(state)}
-    return resp
+    # State was already complete and user didn't add anything new — avoid re-searching
+    user_added_new_field = any(
+        _is_valid_value(extracted.get(k))
+        for k in ("origin", "destination", "departure_time", "return_time")
+    )
+    if was_complete and not user_added_new_field:
+        resp = {
+            "kind": "ticket_search",
+            "done": False,
+            "message": (
+                "Those are the best fares available for that journey. "
+                "Would you like to try a different departure time, date, or route?"
+            ),
+        }
+        if debug:
+            resp["ticket_debug"] = {"step": "comment_on_results", "state": dict(state)}
+        return resp
+
+    return None  # all slots filled and new data present — proceed to search
 
 
 def _run_search(state: dict[str, Any], debug: bool) -> dict[str, Any]:
@@ -425,7 +407,6 @@ def _run_search(state: dict[str, Any], debug: bool) -> dict[str, Any]:
         if inward_time:
             inbound = _booking_link(dest_codes[0], origin_codes[0], inward_time)
             msg += f"\n\nReturn journey (single ticket): [National Rail journey planner]({inbound})"
-        # Keep origin/destination/departure_time for follow-up queries; only clear return_time
         state["return_time"] = None
         resp = {"kind": "ticket_search", "done": True, "message": msg, "journeys": []}
         if debug:
@@ -452,8 +433,6 @@ def _run_search(state: dict[str, Any], debug: bool) -> dict[str, Any]:
     note   = "Note: departure time was assumed.\n" if assumed else ""
     plural = f"Searched {len(origin_codes)}×{len(dest_codes)} station combinations.\n" if len(origin_codes) + len(dest_codes) > 2 else ""
 
-    # Keep origin/destination/departure_time so the user can say "also want a return at X"
-    # without repeating their journey details. Only wipe return_time (already shown).
     state["return_time"] = None
 
     all_top5 = top5_out + top5_in
