@@ -50,6 +50,14 @@ def _now_str() -> str:
 
 
 def _extract_ticket_fields(user_input: str, state: dict[str, Any]) -> dict[str, Any]:
+    missing = [f for f in ("origin", "destination", "departure_time") if not state.get(f)]
+    pending = (
+        f"The conversation is currently waiting for these still-missing fields, in order: {missing}.\n"
+        "If the user's message is just a bare station/place name with no 'from'/'to' wording, assign it to "
+        "the FIRST field in that missing list and leave the others null.\n"
+        "Do NOT overwrite a field that is already filled in current state unless the user explicitly uses "
+        "'from X' (origin) or 'to Y' (destination).\n"
+    ) if missing else ""
     prompt = (
         f"Current date and time: {_now_str()}\n\n"
         "Extract ticket search fields from the user message and reply with a single JSON object.\n"
@@ -60,12 +68,16 @@ def _extract_ticket_fields(user_input: str, state: dict[str, Any]) -> dict[str, 
         "FOLLOW-UP RULES (current state may already have values from a previous search):\n"
         "- If origin and/or destination are already in current state and the user does NOT mention new ones, keep them as-is (output null so _update_state leaves them untouched).\n"
         "- If the user says 'return', 'come back', 'going back', 'on the way back', or similar WITHOUT giving a new origin/destination, they want to add a return leg to the SAME journey  set return_time only, leave origin/destination null.\n"
-        "- If the user gives a completely new origin or destination, override that field.\n"
+        "- Only override an already-filled origin/destination if the user explicitly says 'from X' or 'to Y'.\n"
+        f"{pending}"
         "If origin, destination, or departure_time is genuinely absent from the message AND not already in current state, "
         "put one short follow-up question in next_question; otherwise next_question must be null.\n\n"
         "Example follow-up: state has origin=Liverpool, destination=Southampton, departure_time=2026-05-25T18:00:00\n"
         "User: \"also want a return after tomorrow night\"\n"
         "Output: {\"origin\": null, \"destination\": null, \"departure_time\": null, \"return_time\": \"2026-05-25T23:00:00\", \"next_question\": null}\n\n"
+        "Example bare answer: state has origin=Girvan, destination=null, departure_time=2026-05-29T09:00:00 (waiting for destination)\n"
+        "User: \"norwich\"\n"
+        "Output: {\"origin\": null, \"destination\": \"norwich\", \"departure_time\": null, \"return_time\": null, \"next_question\": null}\n\n"
         "Example new search: \"I want to go from Norwich to London tomorrow morning\"\n"
         "Output: {\"origin\": \"Norwich\", \"destination\": \"London\", \"departure_time\": \"2026-05-18T09:00:00\", \"return_time\": null, \"next_question\": null}\n\n"
         f"Current state: {state}\n"

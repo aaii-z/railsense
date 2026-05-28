@@ -11,6 +11,7 @@ Questions and expected answers are taken word-for-word from:
 Run:
     python tests/eval_rag.py              # retrieval metrics only
     python tests/eval_rag.py --judge      # also score answers with LLM
+    python tests/eval_rag.py --plot       # save slide-ready plots to models/task3/plots/
 """
 
 import sys
@@ -176,14 +177,17 @@ def is_relevant(chunk: dict, keywords: list[str]) -> bool:
     return any(kw.lower() in text for kw in keywords)
 
 
-def eval_retrieval(threshold: float) -> dict:
+def eval_retrieval(threshold: float, collect_per_query: bool = False) -> dict:
     hits, reciprocal_ranks, no_results = 0, 0.0, 0
+    per_query = []
 
     for item in TEST_SET:
         chunks = retrieve(item["query"], top_k=TOP_K, min_score=threshold)
 
         if not chunks:
             no_results += 1
+            if collect_per_query:
+                per_query.append({"query": item["query"], "rank": None, "score": 0.0})
             continue
 
         hit = False
@@ -192,16 +196,161 @@ def eval_retrieval(threshold: float) -> dict:
                 if not hit:
                     reciprocal_ranks += 1 / rank
                     hit = True
+                    if collect_per_query:
+                        per_query.append({
+                            "query": item["query"],
+                            "rank":  rank,
+                            "score": chunk["score"],
+                        })
         if hit:
             hits += 1
+        elif collect_per_query:
+            per_query.append({"query": item["query"], "rank": None, "score": 0.0})
 
     n = len(TEST_SET)
-    return {
+    result = {
         "threshold":   threshold,
         "hit@5":       hits / n * 100,
         "mrr":         reciprocal_ranks / n,
         "no_result_%": no_results / n * 100,
     }
+    if collect_per_query:
+        result["per_query"] = per_query
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Slide plots
+# ---------------------------------------------------------------------------
+
+PLOT_DIR = _ROOT / "models" / "task3" / "plots"
+
+def save_plots(per_query: list[dict], summary: dict) -> None:
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as mpatches
+    import numpy as np
+
+    PLOT_DIR.mkdir(parents=True, exist_ok=True)
+
+    SWR_RED   = "#C8102E"
+    SWR_DARK  = "#1A1A2E"
+    GREY      = "#E8E8E8"
+    HIT_COLOR = SWR_RED
+    MISS_COLOR = "#AAAAAA"
+
+    plt.rcParams.update({
+        "font.family": "sans-serif",
+        "axes.spines.top":   False,
+        "axes.spines.right": False,
+    })
+
+    # --- Plot 1: Rank distribution bar chart ---
+    ranks = [p["rank"] for p in per_query]
+    rank_counts = {r: ranks.count(r) for r in [1, 2, 3, 4, 5]}
+    miss_count  = ranks.count(None)
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    fig.patch.set_facecolor("white")
+
+    labels = ["Rank 1", "Rank 2", "Rank 3", "Rank 4", "Rank 5", "Miss"]
+    values = [rank_counts.get(i, 0) for i in range(1, 6)] + [miss_count]
+    colors = [HIT_COLOR if v > 0 and i < 5 else (MISS_COLOR if i == 5 else GREY)
+              for i, v in enumerate(values)]
+    colors = [HIT_COLOR] * 5 + [MISS_COLOR]
+
+    bars = ax.bar(labels, values, color=colors, edgecolor="white", linewidth=1.5, width=0.6)
+
+    for bar, val in zip(bars, values):
+        if val > 0:
+            ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.05,
+                    str(val), ha="center", va="bottom", fontsize=13, fontweight="bold",
+                    color=SWR_DARK)
+
+    ax.set_ylim(0, max(values) + 2)
+    ax.set_ylabel("Number of queries", fontsize=11, color=SWR_DARK)
+    ax.set_title("Where does the right answer appear? (Top-5 retrieval, 15 queries)",
+                 fontsize=13, fontweight="bold", color=SWR_DARK, pad=14)
+    ax.tick_params(colors=SWR_DARK)
+    ax.yaxis.set_major_locator(plt.MaxNLocator(integer=True))
+
+    hit_patch  = mpatches.Patch(color=HIT_COLOR,  label=f"Hit  ({sum(v for v in values[:5])} queries)")
+    miss_patch = mpatches.Patch(color=MISS_COLOR, label=f"Miss ({miss_count} queries)")
+    ax.legend(handles=[hit_patch, miss_patch], fontsize=10, framealpha=0)
+
+    plt.tight_layout()
+    out1 = PLOT_DIR / "eval_rank_distribution.png"
+    fig.savefig(out1, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  Saved: {out1}")
+
+    # --- Plot 2: Per-query similarity scores, coloured by rank ---
+    short_labels = [p["query"][:48] + "…" if len(p["query"]) > 48 else p["query"]
+                    for p in per_query]
+    scores = [p["score"] for p in per_query]
+    bar_colors = [HIT_COLOR if p["rank"] == 1 else
+                  "#E07070"  if p["rank"] in (2, 3) else
+                  "#F0A0A0"  if p["rank"] in (4, 5) else
+                  MISS_COLOR
+                  for p in per_query]
+
+    fig, ax = plt.subplots(figsize=(10, 7))
+    fig.patch.set_facecolor("white")
+
+    y_pos = np.arange(len(per_query))
+    ax.barh(y_pos, scores, color=bar_colors, edgecolor="white", linewidth=0.8)
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(short_labels, fontsize=8.5, color=SWR_DARK)
+    ax.invert_yaxis()
+    ax.set_xlabel("Cosine similarity score of first relevant chunk", fontsize=10, color=SWR_DARK)
+    ax.set_title("Per-query retrieval scores", fontsize=13, fontweight="bold",
+                 color=SWR_DARK, pad=14)
+    ax.axvline(0.35, color=SWR_DARK, linestyle="--", linewidth=1, alpha=0.4,
+               label="Min-score threshold (0.35)")
+    ax.set_xlim(0, 1.05)
+    ax.tick_params(colors=SWR_DARK)
+
+    r1 = mpatches.Patch(color=HIT_COLOR,  label="Rank 1")
+    r23= mpatches.Patch(color="#E07070",  label="Rank 2–3")
+    r45= mpatches.Patch(color="#F0A0A0",  label="Rank 4–5")
+    ms = mpatches.Patch(color=MISS_COLOR, label="Miss")
+    ax.legend(handles=[r1, r23, r45, ms], fontsize=9, framealpha=0, loc="lower right")
+
+    plt.tight_layout()
+    out2 = PLOT_DIR / "eval_per_query_scores.png"
+    fig.savefig(out2, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  Saved: {out2}")
+
+    # --- Plot 3: Summary metrics card ---
+    fig, axes = plt.subplots(1, 3, figsize=(10, 3.5))
+    fig.patch.set_facecolor("white")
+
+    metrics = [
+        ("Hit@5", f"{summary['hit@5']:.0f}%",   "Queries with a\nrelevant result in top 5"),
+        ("MRR",   f"{summary['mrr']:.3f}",       "Mean Reciprocal Rank\n(1.0 = always rank 1)"),
+        ("Rank 1\nRate", f"{rank_counts.get(1,0)}/{len(per_query)}",
+                                                 "Queries where the best\nresult is ranked 1st"),
+    ]
+
+    for ax, (title, value, subtitle) in zip(axes, metrics):
+        ax.set_facecolor(SWR_RED)
+        ax.set_xticks([]); ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        ax.text(0.5, 0.72, value,    ha="center", va="center", fontsize=34,
+                fontweight="bold", color="white", transform=ax.transAxes)
+        ax.text(0.5, 0.38, title,    ha="center", va="center", fontsize=13,
+                fontweight="bold", color="white", alpha=0.9, transform=ax.transAxes)
+        ax.text(0.5, 0.13, subtitle, ha="center", va="center", fontsize=8,
+                color="white", alpha=0.75, transform=ax.transAxes)
+
+    fig.suptitle("Task 3 — RAG Retrieval Performance  (15 real staff queries)",
+                 fontsize=12, fontweight="bold", color=SWR_DARK, y=1.02)
+    plt.tight_layout()
+    out3 = PLOT_DIR / "eval_summary_card.png"
+    fig.savefig(out3, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  Saved: {out3}")
 
 
 # ---------------------------------------------------------------------------
@@ -256,11 +405,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--judge", action="store_true",
                         help="Also generate and score answers with the LLM")
+    parser.add_argument("--plot", action="store_true",
+                        help="Save slide-ready plots to models/task3/plots/")
     args = parser.parse_args()
 
     # --- Retrieval metrics ---
     print(f"Evaluating retrieval for {len(TEST_SET)} queries...\n")
-    retrieval_results = [eval_retrieval(t) for t in THRESHOLDS]
+    retrieval_results = [eval_retrieval(t, collect_per_query=(t == 0.35))
+                         for t in THRESHOLDS]
 
     col = f"{'Threshold':>10} {'Hit@5 (%)':>10} {'MRR':>8} {'No-result (%)':>14}"
     print(col)
@@ -273,6 +425,12 @@ if __name__ == "__main__":
     best = max(retrieval_results, key=lambda r: r["mrr"])
     print(f"\nBest MRR at threshold={best['threshold']:.2f}  "
           f"(Hit@5={best['hit@5']:.1f}%  No-result={best['no_result_%']:.1f}%)")
+
+    # --- Plots ---
+    if args.plot:
+        print("\nGenerating slide plots...")
+        current = next(r for r in retrieval_results if r["threshold"] == 0.35)
+        save_plots(current["per_query"], current)
 
     # --- LLM answer judge ---
     if args.judge:

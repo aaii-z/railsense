@@ -39,7 +39,7 @@ def retrieve(
                        station, region, doc_date, section, chunk_text,
                        1 - (embedding <=> %s::vector) AS score
                 FROM documents
-                WHERE section != 'Table'
+                WHERE TRUE
                 {station_filter}
                 ORDER BY chunk_text, embedding <=> %s::vector
             ) sub

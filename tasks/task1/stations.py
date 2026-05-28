@@ -108,8 +108,12 @@ def resolve_station(user_input: str) -> list[str]:
         return STATION_LOOKUP[query][:MAX_STATIONS]
 
     matches = process.extract(query, STATION_LOOKUP.keys(), limit=3)
-    # Drop matches where query is far shorter than the station name (e.g. "lo" → "london")
-    matches = [(n, s, i) for n, s, i in matches if len(query) <= len(n) * 2]
+    # Drop length-mismatched matches: query much shorter than the name ("lo" → "london"),
+    # or a short station name buried inside a longer query ("lahore" → "ore").
+    matches = [
+        (n, s, i) for n, s, i in matches
+        if len(n) * 0.6 <= len(query) <= len(n) * 1.5
+    ]
     if not matches or matches[0][1] < 70:  # below 70: no confident match at all
         return []
 

@@ -27,5 +27,13 @@ CREATE TABLE IF NOT EXISTS conversations (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS staff_users (
+    id            SERIAL PRIMARY KEY,
+    username      VARCHAR(64) UNIQUE NOT NULL,
+    password_hash VARCHAR(256) NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
 CREATE INDEX IF NOT EXISTS conversations_session_idx ON conversations (session_id);
 CREATE INDEX IF NOT EXISTS conversations_created_at_idx ON conversations (created_at);

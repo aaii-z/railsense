@@ -12,8 +12,7 @@ DOCS_DIR = Path(__file__).resolve().parents[2] / "data" / "docs"
 CHUNK_SIZE    = 120   # words per chunk — smaller = more focused retrieval
 CHUNK_OVERLAP = 20    # overlap to avoid cutting sentences mid-thought
 
-# Table rows tend to be identical boilerplate across all stations and pollute retrieval
-_SKIP_SECTIONS = {"Table"}
+_SKIP_SECTIONS: set[str] = set()
 
 
 def extract_text_docx(path: Path) -> list[tuple[str, str]]:
@@ -38,15 +37,21 @@ def extract_text_docx(path: Path) -> list[tuple[str, str]]:
     if buffer:
         sections.append((current_section, " ".join(buffer)))
 
-    # also pull text out of tables
+    # pull text out of tables, preserving header→value structure
     for table in doc.tables:
-        table_text = []
-        for row in table.rows:
-            for cell in row.cells:
-                if cell.text.strip():
-                    table_text.append(cell.text.strip())
-        if table_text:
-            sections.append(("Table", " ".join(table_text)))
+        rows = [[cell.text.strip() for cell in row.cells] for row in table.rows]
+        rows = [r for r in rows if any(r)]
+        if not rows:
+            continue
+        headers = rows[0]
+        for row in rows[1:]:
+            pairs = [
+                f"{h}: {v}"
+                for h, v in zip(headers, row)
+                if h and v and h != v  # skip merged/empty cells
+            ]
+            if pairs:
+                sections.append(("Table", " | ".join(pairs)))
 
     return sections
 

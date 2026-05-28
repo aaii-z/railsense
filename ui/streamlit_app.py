@@ -1,21 +1,17 @@
 import base64
 import os
-import pandas as pd
-import streamlit as st
 import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
+
+import pandas as pd
+import streamlit as st
 from dotenv import load_dotenv
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _TRAIN_ICON_PATH = _REPO_ROOT / "toy-train.png"
 load_dotenv(_REPO_ROOT / ".env")
-
-
-@st.cache_data
-def _train_icon_b64() -> str:
-    return base64.b64encode(_TRAIN_ICON_PATH.read_bytes()).decode()
 
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
@@ -24,6 +20,11 @@ from chatbot.dialogue import handle_message, init_dialogue_state, GREETING, STAF
 from db.conversations import get_sessions, get_session_messages
 from db.staff import authenticate, ensure_default_user
 from voice.transcriber import transcribe
+
+
+@st.cache_data
+def _train_icon_b64() -> str:
+    return base64.b64encode(_TRAIN_ICON_PATH.read_bytes()).decode()
 
 try:
     ensure_default_user()
@@ -260,7 +261,7 @@ with col_auth:
     if st.session_state.is_staff:
         st.markdown(
             '<div style="background:#198754;color:white;padding:4px 10px;border-radius:16px;'
-            'font-size:0.78rem;font-weight:600;text-align:center;margin-bottom:4px;">🔐 Staff</div>',
+            'font-size:0.78rem;font-weight:600;text-align:center;margin-bottom:4px;"> Staff</div>',
             unsafe_allow_html=True,
         )
         if st.button("Logout", key="chat_logout", use_container_width=True):
@@ -276,8 +277,7 @@ with col_auth:
 
 if st.session_state.is_staff:
     st.info(
-        "🔐 **Staff Portal**  You have access to operational contingency guidance and disruption plans.",
-        icon="🚉",
+        " **Staff Portal**  You have access to operational contingency guidance and disruption plans.",
     )
 
 for msg in st.session_state.messages:
