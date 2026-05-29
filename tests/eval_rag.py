@@ -26,7 +26,7 @@ from tasks.task3.retriever import retrieve
 from tasks.task3.llm import answer_contingency_query
 
 # ---------------------------------------------------------------------------
-# Test set — 15 Q&A pairs extracted directly from the documents
+# Test set - 15 Q&A pairs extracted directly from the documents
 # keywords are distinctive phrases from the expected answer used for
 # retrieval relevance checking (Hit@5 / MRR).
 # ---------------------------------------------------------------------------
@@ -96,9 +96,9 @@ TEST_SET = [
     {
         "query": "What 3 pieces of information are included in every SWR disruption message?",
         "expected": (
-            "Every message shows: (1) the cause of disruption — what the problem is "
-            "and where it is; (2) the impact — what this means for the journey; "
-            "(3) the advice — how to continue the journey."
+            "Every message shows: (1) the cause of disruption - what the problem is "
+            "and where it is; (2) the impact - what this means for the journey; "
+            "(3) the advice - how to continue the journey."
         ),
         "keywords": ["cause of disruption", "impact", "advice", "3 key"],
     },
@@ -137,7 +137,7 @@ TEST_SET = [
     {
         "query": "What should I do if passenger information screens are showing wrong information?",
         "expected": (
-            "Make your local SCP aware — they will be able to help by updating the "
+            "Make your local SCP aware - they will be able to help by updating the "
             "screens. If you do not have an SCP, contact the local information "
             "controllers in the WICC."
         ),
@@ -344,7 +344,7 @@ def save_plots(per_query: list[dict], summary: dict) -> None:
         ax.text(0.5, 0.13, subtitle, ha="center", va="center", fontsize=8,
                 color="white", alpha=0.75, transform=ax.transAxes)
 
-    fig.suptitle("Task 3 — RAG Retrieval Performance  (15 real staff queries)",
+    fig.suptitle("Task 3 - RAG Retrieval Performance  (15 real staff queries)",
                  fontsize=12, fontweight="bold", color=SWR_DARK, y=1.02)
     plt.tight_layout()
     out3 = PLOT_DIR / "eval_summary_card.png"

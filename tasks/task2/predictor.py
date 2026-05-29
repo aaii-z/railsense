@@ -308,6 +308,7 @@ def handle_delay_message(
                 "traceback": traceback.format_exc(),
             }
         return response
+    prediction = max(0.0, prediction)
     response = {
         "kind": "delay_prediction",
         "done": True,

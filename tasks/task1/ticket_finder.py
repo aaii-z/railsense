@@ -16,7 +16,7 @@ from tasks.task1.stations import (
 
 
 
-TICKET_KEYS = ["origin", "destination", "departure_time", "return_time", "next_question"]
+TICKET_KEYS = ["origin", "destination", "departure_time", "arrive_by", "return_time", "next_question"]
 
 
 def default_ticket_state() -> dict[str, Any]:
@@ -24,6 +24,7 @@ def default_ticket_state() -> dict[str, Any]:
         "origin":         None,
         "destination":    None,
         "departure_time": None,
+        "arrive_by":      None,
         "return_time":    None,
     }
 
@@ -65,6 +66,10 @@ def _extract_ticket_fields(user_input: str, state: dict[str, Any]) -> dict[str, 
         "departure_time and return_time must be ISO 8601 (e.g. 2026-05-10T09:00:00). "
         "Use the current date above to resolve relative times like 'tomorrow', 'in 2 hours', 'next Friday'. "
         "Treat 'morning' as 09:00, 'afternoon' as 14:00, 'evening' as 18:00 when no specific time is given.\n"
+        "arrive_by: set this (ISO 8601) ONLY when the user expresses an arrival deadline, e.g. 'need to be there by 6pm', "
+        "'arrive by 18:00', 'I need to be in X by Y', 'get there before Z'. "
+        "When arrive_by is set, leave departure_time null (it will be derived automatically). "
+        "Do NOT set arrive_by for normal 'depart at' messages.\n"
         "FOLLOW-UP RULES (current state may already have values from a previous search):\n"
         "- If origin and/or destination are already in current state and the user does NOT mention new ones, keep them as-is (output null so _update_state leaves them untouched).\n"
         "- If the user says 'return', 'come back', 'going back', 'on the way back', or similar WITHOUT giving a new origin/destination, they want to add a return leg to the SAME journey  set return_time only, leave origin/destination null.\n"
@@ -72,14 +77,16 @@ def _extract_ticket_fields(user_input: str, state: dict[str, Any]) -> dict[str, 
         f"{pending}"
         "If origin, destination, or departure_time is genuinely absent from the message AND not already in current state, "
         "put one short follow-up question in next_question; otherwise next_question must be null.\n\n"
+        "Example arrive_by: \"I need to be in Manchester by 6pm travelling from Norwich\"\n"
+        "Output: {\"origin\": \"Norwich\", \"destination\": \"Manchester\", \"departure_time\": null, \"arrive_by\": \"2026-05-29T18:00:00\", \"return_time\": null, \"next_question\": null}\n\n"
         "Example follow-up: state has origin=Liverpool, destination=Southampton, departure_time=2026-05-25T18:00:00\n"
         "User: \"also want a return after tomorrow night\"\n"
-        "Output: {\"origin\": null, \"destination\": null, \"departure_time\": null, \"return_time\": \"2026-05-25T23:00:00\", \"next_question\": null}\n\n"
+        "Output: {\"origin\": null, \"destination\": null, \"departure_time\": null, \"arrive_by\": null, \"return_time\": \"2026-05-25T23:00:00\", \"next_question\": null}\n\n"
         "Example bare answer: state has origin=Girvan, destination=null, departure_time=2026-05-29T09:00:00 (waiting for destination)\n"
         "User: \"norwich\"\n"
-        "Output: {\"origin\": null, \"destination\": \"norwich\", \"departure_time\": null, \"return_time\": null, \"next_question\": null}\n\n"
+        "Output: {\"origin\": null, \"destination\": \"norwich\", \"departure_time\": null, \"arrive_by\": null, \"return_time\": null, \"next_question\": null}\n\n"
         "Example new search: \"I want to go from Norwich to London tomorrow morning\"\n"
-        "Output: {\"origin\": \"Norwich\", \"destination\": \"London\", \"departure_time\": \"2026-05-18T09:00:00\", \"return_time\": null, \"next_question\": null}\n\n"
+        "Output: {\"origin\": \"Norwich\", \"destination\": \"London\", \"departure_time\": \"2026-05-18T09:00:00\", \"arrive_by\": null, \"return_time\": null, \"next_question\": null}\n\n"
         f"Current state: {state}\n"
         f'User: "{user_input}"'
     )
@@ -98,7 +105,7 @@ def _is_valid_value(v) -> bool:
 
 
 def _update_state(state: dict[str, Any], extracted: dict[str, Any]) -> None:
-    for key in ("origin", "destination", "departure_time", "return_time"):
+    for key in ("origin", "destination", "departure_time", "arrive_by", "return_time"):
         if _is_valid_value(extracted.get(key)):
             state[key] = extracted[key]
 
@@ -250,11 +257,26 @@ def _format_journey(journey: dict, depart_by: datetime) -> dict:
 
 
 
-def _pick_top5(journeys: list[dict], depart_by: datetime) -> list[dict]:
-    """Filter to ±3 h window, sort by price, take top 5."""
+def _pick_top5(journeys: list[dict], depart_by: datetime, arrive_by: datetime | None = None) -> list[dict]:
+    """Filter to +-3 h window, optionally filter by arrival deadline, sort by price, take top 5."""
     window = timedelta(hours=3)
     in_window = [j for j in journeys if abs((j["dep_dt"] - depart_by).total_seconds()) <= window.total_seconds()]
-    return sorted(in_window or journeys, key=lambda j: j["pence"])[:5]
+    candidates = in_window or journeys
+    if arrive_by:
+        date_str = depart_by.strftime("%Y-%m-%d")
+        on_time = []
+        for j in candidates:
+            arr = j.get("arrival", "")
+            if arr and ":" in arr:
+                try:
+                    arr_dt = datetime.fromisoformat(f"{date_str}T{arr}:00").replace(tzinfo=_UK_TZ)
+                    if arr_dt <= arrive_by:
+                        on_time.append(j)
+                except ValueError:
+                    pass
+        if on_time:
+            candidates = on_time
+    return sorted(candidates, key=lambda j: j["pence"])[:5]
 
 
 def _search_all_pairs(
@@ -290,7 +312,18 @@ def _collect_slots(user_input: str, state: dict[str, Any], debug: bool) -> dict[
     extracted = _extract_ticket_fields(user_input, state)
     _update_state(state, extracted)
 
-    # Still missing required fields — ask a follow-up question
+    # If the user gave an arrival deadline but no departure time, derive one by searching
+    # 4 hours before the deadline -- wide enough window for any UK domestic journey.
+    if state.get("arrive_by") and not state.get("departure_time"):
+        try:
+            arrive_dt = datetime.fromisoformat(str(state["arrive_by"]).replace("Z", "+00:00"))
+            if arrive_dt.tzinfo is None:
+                arrive_dt = arrive_dt.replace(tzinfo=_UK_TZ)
+            state["departure_time"] = (arrive_dt - timedelta(hours=4)).isoformat()
+        except ValueError:
+            pass
+
+    # Still missing required fields -- ask a follow-up question
     if not _is_complete(state):
         question = extracted.get("next_question") or "Please tell me your origin, destination, and departure time."
         resp: dict[str, Any] = {"kind": "ticket_search", "done": False, "message": question}
@@ -298,10 +331,10 @@ def _collect_slots(user_input: str, state: dict[str, Any], debug: bool) -> dict[
             resp["ticket_debug"] = {"step": "collecting_fields", "state": dict(state)}
         return resp
 
-    # State was already complete and user didn't add anything new — avoid re-searching
+    # State was already complete and user didn't add anything new -- avoid re-searching
     user_added_new_field = any(
         _is_valid_value(extracted.get(k))
-        for k in ("origin", "destination", "departure_time", "return_time")
+        for k in ("origin", "destination", "departure_time", "arrive_by", "return_time")
     )
     if was_complete and not user_added_new_field:
         resp = {
@@ -379,6 +412,16 @@ def _run_search(state: dict[str, Any], debug: bool) -> dict[str, Any]:
             resp["ticket_debug"] = {**dbg, "step": "crs_lookup_failed", "failed_for": "destination"}
         return resp
 
+    # Parse arrive_by if present
+    arrive_by_dt: datetime | None = None
+    if state.get("arrive_by"):
+        try:
+            arrive_by_dt = datetime.fromisoformat(str(state["arrive_by"]).replace("Z", "+00:00"))
+            if arrive_by_dt.tzinfo is None:
+                arrive_by_dt = arrive_by_dt.replace(tzinfo=_UK_TZ)
+        except ValueError:
+            arrive_by_dt = None
+
     # Parse times
     depart_by, assumed = _parse_time(str(state["departure_time"]))
     if depart_by is None:
@@ -398,6 +441,7 @@ def _run_search(state: dict[str, Any], debug: bool) -> dict[str, Any]:
 
     inward_time, _ = _parse_time(state.get("return_time"))
     dbg["depart_by"]      = depart_by.isoformat()
+    dbg["arrive_by"]      = arrive_by_dt.isoformat() if arrive_by_dt else None
     dbg["inward_time"]    = inward_time.isoformat() if inward_time else None
     dbg["pairs_searched"] = [f"{o}→{d}" for o in origin_codes for d in dest_codes]
 
@@ -420,16 +464,17 @@ def _run_search(state: dict[str, Any], debug: bool) -> dict[str, Any]:
             inbound = _booking_link(dest_codes[0], origin_codes[0], inward_time)
             msg += f"\n\nReturn journey (single ticket): [National Rail journey planner]({inbound})"
         state["return_time"] = None
+        state["arrive_by"] = None
         resp = {"kind": "ticket_search", "done": True, "message": msg, "journeys": []}
         if debug:
             resp["ticket_debug"] = dbg
         return resp
 
-    # Pick top-5 outward journeys (±3 h window, sorted by price)
-    top5_out = _pick_top5(all_outward, depart_by)
+    # Pick top-5 outward journeys (+-3 h window, filtered by arrive_by if set, sorted by price)
+    top5_out = _pick_top5(all_outward, depart_by, arrive_by=arrive_by_dt)
 
     lines = ["**Outward journeys (single ticket):**"] + [
-        f"{i}. {j['origin']} → {j['destination']} | dep {j['departure']} arr {j['arrival']} | from {j['price']} - [Book ticket]({j['link']})"
+        f"{i}. {j['origin']} -> {j['destination']} | dep {j['departure']} arr {j['arrival']} | from {j['price']} - [Book ticket]({j['link']})"
         for i, j in enumerate(top5_out, 1)
     ]
 
@@ -438,20 +483,22 @@ def _run_search(state: dict[str, Any], debug: bool) -> dict[str, Any]:
     if is_return and all_inward and inward_time:
         top5_in = _pick_top5(all_inward, inward_time)
         lines += ["", "**Return journeys (single ticket):**"] + [
-            f"{i}. {j['origin']} → {j['destination']} | dep {j['departure']} arr {j['arrival']} | from {j['price']} - [Book ticket]({j['link']})"
+            f"{i}. {j['origin']} -> {j['destination']} | dep {j['departure']} arr {j['arrival']} | from {j['price']} - [Book ticket]({j['link']})"
             for i, j in enumerate(top5_in, 1)
         ]
 
+    arrive_note = f"Showing trains that arrive by {arrive_by_dt.strftime('%H:%M')}.\n" if arrive_by_dt else ""
     note   = "Note: departure time was assumed.\n" if assumed else ""
-    plural = f"Searched {len(origin_codes)}×{len(dest_codes)} station combinations.\n" if len(origin_codes) + len(dest_codes) > 2 else ""
+    plural = f"Searched {len(origin_codes)}x{len(dest_codes)} station combinations.\n" if len(origin_codes) + len(dest_codes) > 2 else ""
 
     state["return_time"] = None
+    state["arrive_by"] = None
 
     all_top5 = top5_out + top5_in
     resp = {
         "kind":     "ticket_search",
         "done":     True,
-        "message":  note + plural + "\n".join(lines),
+        "message":  arrive_note + note + plural + "\n".join(lines),
         "journeys": [{k: v for k, v in j.items() if k not in ("pence", "dep_dt")} for j in all_top5],
     }
     if debug:

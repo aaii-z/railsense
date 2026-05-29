@@ -51,8 +51,10 @@ if "chat_widget_key" not in st.session_state:
 
 # ── UI helpers ────────────────────────────────────────────────────────────────
 
-def _spinner_text(dialogue_state: dict, user_input: str) -> str:
+def _spinner_text(dialogue_state: dict, user_input: str, is_staff: bool = False) -> str:
     """Return a task-specific spinner label so users know what's happening."""
+    if is_staff:
+        return "📋 Searching contingency plans..."
     active = dialogue_state.get("active_task")
     if active == "ticket_search":
         return "🔍 Searching live fares..."
@@ -60,7 +62,7 @@ def _spinner_text(dialogue_state: dict, user_input: str) -> str:
         return "⏱️ Running delay prediction..."
     if active == "contingency":
         return "📋 Searching contingency plans..."
-    # No active task yet  peek at keywords in the message
+    # No active task yet -- peek at keywords in the message
     msg = user_input.lower()
     if any(w in msg for w in ("ticket", "fare", "book", "journey", "travel", "cheapest", "single", "return")):
         return "🔍 Searching live fares..."
@@ -296,8 +298,8 @@ _is_fresh = (
 )
 if _is_fresh and not st.session_state.is_staff:
     _chips = [
-        ("🎫 Find a cheap ticket", "I want to find the cheapest train ticket for my journey"),
-        ("⏱️ My train is delayed", "My train is delayed, can you predict arrival?"),
+        ("Find a cheap ticket", "I want to find the cheapest train ticket for my journey"),
+        ("My train is delayed", "My train is delayed, can you predict arrival?"),
     ]
     _chip_cols = st.columns(len(_chips))
     for _i, (_label, _prompt) in enumerate(_chips):
@@ -358,7 +360,7 @@ if st.session_state.text_to_process:
         st.caption(user_ts)
 
     with st.chat_message("assistant"):
-        with st.spinner(_spinner_text(st.session_state.dialogue_state, text_to_process)):
+        with st.spinner(_spinner_text(st.session_state.dialogue_state, text_to_process, is_staff=st.session_state.is_staff)):
             try:
                 response = handle_message(
                     text_to_process,
